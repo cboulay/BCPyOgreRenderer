@@ -1,16 +1,18 @@
+// blackness genrated by blender2ogre 0.5.9
 
-// blender material: blackness
 material blackness 
 {
-    receive_shadows on
-    technique b2ogre_1324594872.948697
+    receive_shadows on 
+
+    technique
     {
-        pass b2ogre_1324594872.94872
+        pass blackness
         {
             ambient 0.0 0.0 0.0 1.0
             diffuse 0.0 0.0 0.0 1.0
             specular 0.0 0.0 0.0 1.0 12.5
             emissive 0.0 0.0 0.0 1.0
+
             alpha_to_coverage off
             colour_write on
             cull_hardware clockwise
@@ -27,6 +29,7 @@ material blackness
             scene_blend_op add
             shading gouraud
             transparent_sorting on
+
         }
     }
 }

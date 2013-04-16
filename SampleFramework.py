@@ -8,7 +8,7 @@ ogre.OgreVersion = ogre.GetOgreVersion()
 ogre.OgreVersionString = ogre.OgreVersion[0] + ogre.OgreVersion[1] + ogre.OgreVersion[2]
 ogre.PythonOgreVersion = ogre.GetPythonOgreVersion()
 
-from ogre.renderer.OGRE.sf_OIS import * 
+from ogre.renderer.OGRE.sf_OIS import *
 
 import logging
 logger=None
@@ -30,7 +30,7 @@ def setupLogging (logfilename="demo.log", logidentifier='PythonOgre.Demo'):
     console.setFormatter(formatter)
     # add the handler to the root logger
     logging.getLogger('').addHandler(console)
-    
+
     logger = logging.getLogger(logidentifier)
 
 def info ( msg ):
@@ -47,10 +47,4 @@ def debug ( msg ):
 
 def warning ( msg ):
     if logger:
-        logger.warning( msg )  
- 
-
-
-           
-    
-
+        logger.warning( msg )
