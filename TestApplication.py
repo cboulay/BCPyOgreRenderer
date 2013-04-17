@@ -43,12 +43,12 @@ class BciApplication(BciGenericApplication):
 
         Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
                                          # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
-        w,h = self.screen.size
+        #w,h = self.screen.size
         #self.screen.SetDefaultFont('comic sans ms', 30)
         self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
-                                        position=(w/2,h/2),
+                                        position=(100, 100),
                                         anchor='top'         )
-        self.color = numpy.array([1.0, 0.0, 0.0])
+        #self.color = numpy.array([1.0, 0.0, 0.0])
 
     #############################################################
 

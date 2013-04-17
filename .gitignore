@@ -1,0 +1,7 @@
+*.py[cod]
+.project
+.pydevproject
+ogre.cfg
+*.log
+.settings
+org.eclipse.*

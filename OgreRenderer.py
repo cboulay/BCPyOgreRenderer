@@ -634,92 +634,113 @@ class Movie(ImageStimulus):
 
 class Text():
     """Docstring"""
-    def __init__(self, text='Hello world', font_name=None, font_size=None, position=(10,10), color=(1, 1, 1), anchor='lower left', angle=0.0, on=True, smooth=True):
+    def __init__(self, text='Hello world', font_name="BlueHighway",\
+                  font_size=16, position=(10,10), color=(1, 1, 1), anchor='lower left', angle=0.0, on=True, smooth=True):
         #Create an overlay
         ovm = ogre.OverlayManager.getSingleton()
-        overlay = ov = ovm.create("OverlayName")
+        overlay = ovm.create("OverlayName")
 
         #Create a panel
         panel = ovm.createOverlayElement("Panel", "PanelName")
-        #panel.setPosition(x,y)
-        #panel.setDimensions(x,y)
-        #panel.setMaterialName("MaterialName")
+        panel.setMetricsMode(ogre.GMM_PIXELS)
+        panel.setPosition(*position)
+        panel.setDimensions(400,400)
+        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
 
         #Create a text area
         textArea = ovm.createOverlayElement("TextArea", "TextAreaName")
-        #textArea.setPosition(0, 0)
-        #textArea.setDimensions(100, 100)
-        #textArea.setCaption("Hello, World!")
-        #textArea.setCharHeight(16)
-        #textArea.setFontName("TrebuchetMSBold")
-        #textArea.setColourBottom(0.3, 0.5, 0.3)
-        #textArea.setColourTop(0.5, 0.5, 0.5)
+        textArea.setMetricsMode(ogre.GMM_PIXELS)
+        textArea.setPosition(0, 0)
+        textArea.setDimensions(100, 100)
+        textArea.setCaption(text)
+        textArea.setCharHeight(font_size)
+        textArea.setFontName(font_name)
+        textArea.setColourTop( ogre.ColourValue(1.0, 1.0, 1.0) )
+        textArea.setColourBottom( ogre.ColourValue(1.0, 1.0, 1.0) )
 
         #Put it together
-        panel.addChild(textArea)#Add the text area to the panel
         overlay.add2D(panel)#Add the panel to the overlay
-        overlay.show()#Show the overlay
+        panel.addChild(textArea)#Add the text area to the panel
+        if on: overlay.show()#Show the overlay
 
-    def transform(self, screencoords, force=False):
-        p = self._props
-        if self.__font_changed:
-            fn = FindFont(p['font_name'])
-            if fn != None: self.__font_object = pygame.font.Font(fn, p['font_size'])
-            self.__font_changed = False
-            self.__text_changed = True
-        if self.__text_changed:
-            t = str(p['text'])
-            if p['value'] != None:
-                val = p['value']
-                if isinstance(val, list): val = tuple(val)
-                try: t = t % val
-                except: pass
-            orig = self.__font_object.render(t, True, (255,255,255)) # TODO: multiline text....
-            self.__text_changed = False
-            self.size = Coords.Size((orig.get_width(), orig.get_height()))
-            self.content = orig
-        return ImageStimulus.transform(self, screencoords=screencoords, force=force)
+        self.overlay = overlay
+        self.panel = panel
+        self.textArea = textArea
 
-    @apply
-    def value():
-        def fget(self):  p = self._props; return p['value']
-        def fset(self, val):
-            if isinstance(val, (tuple,list,numpy.ndarray)): val = list(val)
-            p = self._props;
-            self.__text_changed = p['value'] != val
-            p['value'] = val
-        return property(fget, fset, doc='optional list of values for interpolation into text')
+    #Define the following properties:
+    #value
+    #text
+    #font_name
+    #font_size
+    #on
+    #color
+    #angle
+    #smooth
+    #flipx
+    #flipy
 
-    @apply
-    def text():
-        def fget(self):  p = self._props; return p['text']
-        def fset(self, val):
-            if val == None or val == '': val = ' '
-            p = self._props;
-            self.__text_changed = p['text'] != val
-            p['text'] = val
-        return property(fget, fset, doc='text content')
-
-    @apply
-    def font_name():
-        def fget(self):  p = self._props; return p['font_name']
-        def fset(self, val):
-            p = self._props;
-            self.__font_changed = p['font_name'] != val
-            p['font_name'] = val
-        return property(fget, fset, doc='font name')
-
-    @apply
-    def font_size():
-        def fget(self):  p = self._props; return p['font_size']
-        def fset(self, val):
-            p = self._props;
-            self.__font_changed = p['font_size'] != val
-            p['font_size'] = val
-        return property(fget, fset, doc='font size')
-
-    def _getAttributeNames(self):
-        return self._props.keys()
+#===============================================================================
+#    def transform(self, screencoords, force=False):
+#        p = self._props
+#        if self.__font_changed:
+#            fn = FindFont(p['font_name'])
+#            if fn != None: self.__font_object = pygame.font.Font(fn, p['font_size'])
+#            self.__font_changed = False
+#            self.__text_changed = True
+#        if self.__text_changed:
+#            t = str(p['text'])
+#            if p['value'] != None:
+#                val = p['value']
+#                if isinstance(val, list): val = tuple(val)
+#                try: t = t % val
+#                except: pass
+#            orig = self.__font_object.render(t, True, (255,255,255)) # TODO: multiline text....
+#            self.__text_changed = False
+#            self.size = Coords.Size((orig.get_width(), orig.get_height()))
+#            self.content = orig
+#        return ImageStimulus.transform(self, screencoords=screencoords, force=force)
+#
+#    @apply
+#    def value():
+#        def fget(self):  p = self._props; return p['value']
+#        def fset(self, val):
+#            if isinstance(val, (tuple,list,numpy.ndarray)): val = list(val)
+#            p = self._props;
+#            self.__text_changed = p['value'] != val
+#            p['value'] = val
+#        return property(fget, fset, doc='optional list of values for interpolation into text')
+#
+#    @apply
+#    def text():
+#        def fget(self):  p = self._props; return p['text']
+#        def fset(self, val):
+#            if val == None or val == '': val = ' '
+#            p = self._props;
+#            self.__text_changed = p['text'] != val
+#            p['text'] = val
+#        return property(fget, fset, doc='text content')
+#
+#    @apply
+#    def font_name():
+#        def fget(self):  p = self._props; return p['font_name']
+#        def fset(self, val):
+#            p = self._props;
+#            self.__font_changed = p['font_name'] != val
+#            p['font_name'] = val
+#        return property(fget, fset, doc='font name')
+#
+#    @apply
+#    def font_size():
+#        def fget(self):  p = self._props; return p['font_size']
+#        def fset(self, val):
+#            p = self._props;
+#            self.__font_changed = p['font_size'] != val
+#            p['font_size'] = val
+#        return property(fget, fset, doc='font size')
+#
+#    def _getAttributeNames(self):
+#       return self._props.keys()
+#===============================================================================
 
 def FindFont(fontnames):
     """
