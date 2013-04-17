@@ -63,15 +63,15 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
     1. `if self._optimize_display_thread_affinity: PrecisionTiming.SetThreadAffinity([0])`
     2. `paramdefs,statedefs = super(BciGenericApplication, self)._Construct()`    # Core's Construct. params and states.
     3. `self._merge_defs(paramdefs, statedefs, self.Construct())` # Our application's Construct. params and states.
-    4. If we still don't have a self.screen, instantiate PandaRenderer (or VisionEggRenderer if no renderer is specified)
-        1. `PandaRenderer.__init__()` sets some constants. Not much else.
+    4. If we still don't have a self.screen, instantiate OgreRenderer (or VisionEggRenderer if no renderer is specified)
+        1. `OgreRenderer.__init__()` sets some constants. Not much else.
     5. Do something with the VisualStimuli global class
 
 ### Preflight and Initialize phase. From (8) in the BCI2000 stage.
 1. Calls BciGenericApplication._Preflight
     1. super's _Preflight doesn't do anything relevant to us.
     2. subclass (our app)'s Preflight
-        1. self.screen.setup(frameless_window=0)
+        1. `self.screen.setup(frameless_window=0)` is our renderer setup
 2. Calls BciGenericApplication._Initialize
     1. super's _Initialize not relevant here.
     2. Get the 'visual display' thread, make sure it is ready, then post 'init'
@@ -85,7 +85,7 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
         7. Use self._optimize_display_thread_affinity and self.optimize_display_thead_priority
         8. `self.focus('operator')`
         9. `mythread.read('init', remove=False)`
-        10. Do a single loop, remove 'init', then do all the loops (as long as the thread doesn't receive a stop message)
+        10. Do a single frame, remove 'init', then do all the loops (as long as the thread doesn't receive a stop message)
             1. `events = self.screen.GetEvents()` #Logged (ftdb)
             2. `self._lock.acquire('Frame') #Logged
             3. if running, do Event+Frame
@@ -100,3 +100,33 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
             9. frame count, end iteration #Logged
         11. `self._lock.release('Frame')`
         12. `self.screen.Cleanup()`
+
+## Stimulus Life-Cycle
+
+### Initialize
+1. `myApp.stimulus(name, stimClass, z=0, **kwargs)`
+    1. Makes sure myApp has .stimuli, ._stimlist, ._stimz, ._stimq
+    2. `s = BciStimulus(myApp, name, z)`
+        - This is a wrapper object for stimuli
+        - It has .z and .obj attributes, where .obj is the actual stimulus object
+        - It exposes .leave() and .enter() for the stimz queue
+        - It might also expose the .obj.* attributes as s.* attributes (or parameters.* attributes to s.* attributes for VisionEgg stimuli)
+    3.  Passes the stimClass through Core.BciFunc to get maker, passes along the kwargs, `s._maker = maker`
+        - maker is just a wrapper for the callable (I guess the callable is the class instantiation)
+        - maker remembers its original pargs and kwargs, allows new kwargs to be added on subsequent calls, and allows pargs to be suppressed with new pargs on subsequent calls
+    4. `s.enter()`
+        1. Appends the stimulus to myApp._stimq and sets it in myApp.stimuli dict
+    5. return s
+
+### Rendering
+In the case of VisionEggRenderer
+1. myApp._update_stimlist()
+    1. Runs itself on each of _stimq
+    2. Each _stimq z-val is inserted into self._stimz at the appropriate index for its z-val, and the stim object itself is inserted into self._stimlist at the appropriate index
+2. myApp.screen.StartFrame(myApp._stimlist)
+    1. Clear the screen
+    2. `myApp.screen._viewport.parameters.stimuli = myApp._stimlist` #myApp.screen._viewport = VisionEgg.Core.Viewport(screen=self._screen)
+    3. `myApp.screen._viewport.draw()`
+
+I guess that means that VisionEggRenderer requires the stimuli to be in order according to the z-value. In our case, that isn't necessary.
+How can we still use the myApp.stimulus function but save cycles on _update_stimlist because we don't need it?

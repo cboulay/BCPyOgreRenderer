@@ -1,3 +1,5 @@
+#Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
+
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
 import os
@@ -34,21 +36,21 @@ class OgreRenderer(BciGenericRenderer):
         frameless_window = None, always_on_top = None, title=None,
         coordinate_mapping = None,
         **kwds):
-        #Set any constants that may come from the GUI parameters.
+        #Set any constants that may come from the parameters.
+        #Called during application preflight on the main thread
         pass
 
     def Initialize(self, bci=None):
+        #Called after generic preflights, after generic _Initialize, but before application Initialize
+        #On the 'visual display' thread
         self._bci = bci
-        #Renderer GO
         self.createRoot()
         self.defineResources()
         self.setupRenderSystem()
         self.createRenderWindow()
         self.initializeResourceGroups()
         self.setupScene()
-        #self.setupInputSystem()
-        #self.setupCEGUI()
-        #self.createFrameListener()
+        self.createFrameListener()
 
     # The Root constructor for the ogre
     def createRoot(self):
@@ -56,29 +58,29 @@ class OgreRenderer(BciGenericRenderer):
 
     # Here the resources are read from the resources.cfg
     def defineResources(self):
+        rgm = ogre.ResourceGroupManager.getSingleton()
         cf = ogre.ConfigFile()
-        cf.load(self.resource_path)
 
+        cf.load(self.resource_path)
         seci = cf.getSectionIterator()
         while seci.hasMoreElements():
             secName = seci.peekNextKey()
             settings = seci.getNext()
-
             for item in settings:
                 typeName = item.key
                 archName = item.value
-                ogre.ResourceGroupManager.getSingleton().addResourceLocation(archName, typeName, secName)
+                rgm.addResourceLocation(archName, typeName, secName)
 
     # Create and configure the rendering system (either DirectX or OpenGL) here
-    def setupRenderSystem(self):
+    def setupRenderSystem(self): #Delete ogre.cfg to show the config dialog box
         if not self.root.restoreConfig() and not self.root.showConfigDialog():
             raise Exception("User canceled the config dialog -> Application.setupRenderSystem()")
 
     # Create the render window
     def createRenderWindow(self):
         self.root.initialise(True, "Tutorial Render Window")
-        self.window = self.root.getAutoCreatedWindow()
-        self.window.setDeactivateOnFocusChange(False)
+        self.renderWindow = self.root.getAutoCreatedWindow()
+        self.renderWindow.setDeactivateOnFocusChange(False)
 
     # Initialize the resources here (which were read from resources.cfg in defineResources()
     def initializeResourceGroups(self):
@@ -88,47 +90,39 @@ class OgreRenderer(BciGenericRenderer):
     # Now, create a scene here. Three things that MUST BE done are sceneManager, camera and
     # viewport initializations
     def setupScene(self):
-        sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
-        #sceneManager.ambientLight = 0.25, 0.25, 0.25
-        sceneManager.setAmbientLight(ogre.ColourValue(1, 1, 1))
+        #Create and configure the scene manager
+        self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
+        self.sceneManager.setAmbientLight(ogre.ColourValue(0.7, 0.7, 0.7))
+        self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
+        self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0002)
 
-        camera = sceneManager.createCamera("Camera")
-        camera.setPosition(0, 100, 500)
-        camera.lookAt(ogre.Vector3(0, 25, 0))
-        camera.setNearClipDistance(15)
+        #Create and configure the camera
+        self.camera = self.sceneManager.createCamera("Camera")
+        self.camera.setPosition( ogre.Vector3(0, 100, -400) )
+        self.camera.lookAt( ogre.Vector3(0, 25, 1) )
+        self.camera.setNearClipDistance(15)
 
-        viewPort = self.root.getAutoCreatedWindow().addViewport(camera)
-        viewPort.setBackgroundColour(ogre.ColourValue(0, 0, 0))
-        self.viewPort = viewPort
+        #Create and configure the viewPort
+        self.viewPort = self.root.getAutoCreatedWindow().addViewport(self.camera)
+        self.viewPort.setBackgroundColour(self._bgcolor)
 
-        ent = sceneManager.createEntity("Hand", "hand.mesh")
-        node = sceneManager.getRootSceneNode().createChildSceneNode("HandNode")
-        node.attachObject(ent)
-        node.setScale(50,50,50)
-        self.hand = node
-        #self.hand.yaw(.002)
+        #Add a light source
+        light = self.sceneManager.createLight("Light1")
+        #light.type = ogre.Light.LT_POINT
+        light.position = 20, 80, 50 #light.setPosition ( ogre.Vector3(20, 80, 50) )
+        #light.diffuseColour = 1, 1, 1
+        #light.specularColour = 1, 1, 1
 
-        light = sceneManager.createLight("Light1")
-        light.type = ogre.Light.LT_POINT
-        light.position = 250, 150, 250
-        light.diffuseColour = 1, 1, 1
-        light.specularColour = 1, 1, 1
+        #Add an entity
+        self.entityHand = self.sceneManager.createEntity("Hand", "hand.mesh")
+        self.nodeHand = self.sceneManager.getRootSceneNode().createChildSceneNode("HandNode")
+        self.nodeHand.attachObject(self.entityHand)
+        self.nodeHand.setScale(50,50,50)
+        #Try something like self.nodeHand.yaw(.2) while the app is running
 
-    # here setup the input system (OIS is the one preferred with Ogre3D)
-    def setupInputSystem(self):
-        windowHandle = 0
-        renderWindow = self.root.getAutoCreatedWindow()
-        windowHandle = renderWindow.getCustomAttributeInt("WINDOW")
-        paramList = [("WINDOW", str(windowHandle))]
-        self.inputManager = OIS.createPythonInputSystem(paramList)
-
-        # Now InputManager is initialized for use. Keyboard and Mouse objects
-        # must still be initialized separately
-        try:
-            self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, False)
-            self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, False)
-        except Exception, e:
-            raise e
+    def createFrameListener(self):
+        self.eventListener = EventListener(self.renderWindow, True, True, False) # switch the final "False" into "True" to get joystick support
+        self.root.addFrameListener(self.eventListener)
 
     def GetFrameRate(self):
         return self.framerate  # TODO: not the real framerate
@@ -142,6 +136,10 @@ class OgreRenderer(BciGenericRenderer):
             pass
 
     def GetEvents(self):
+        #This is called on every visual display iteration
+        #Return an array of events
+        #Each item in the array is passed to myBCPyApplication.Event
+        #TODO: Move the keyboard/mouse/joystick capture from EventListener to here.
         return []
         #return pygame.event.get()
 
@@ -150,6 +148,8 @@ class OgreRenderer(BciGenericRenderer):
         #return (event.type == pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
 
     def StartFrame(self, objlist):
+        #Called on every visual display iteration
+        #objlist is the list of stimuli
         ogre.WindowEventUtilities().messagePump()
         self.root.renderOneFrame()
         time.sleep(.0001)
@@ -173,20 +173,158 @@ class OgreRenderer(BciGenericRenderer):
     def height(self): return self.size[1]
     def get_size(self): return self.size
 
-    @apply
-    def bgcolor():
-        def fget(self):
-            return self._bgcolor
-        def fset(self, value):
-            self._bgcolor = value
-            self.viewPort.setBackgroundColour(self._bgcolor)
-        return property(fget, fset)
+    @property
+    def bgcolor(self):
+        """Color of viewPort.BackgroundColour"""
+        return self._bgcolor
+    @bgcolor.setter
+    def bgcolor(self, value):
+        self._bgcolor = value
+        self.viewPort.setBackgroundColour(self._bgcolor)
     color=bgcolor
 
     def Cleanup(self):
+        del self.eventListener
         self.root.shutdown()
+        #=======================================================================
+        # self.inputManager.destroyInputObjectKeyboard(self.keyboard)
+        # self.inputManager.destroyInputObjectMouse(self.mouse)
+        # OIS.InputManager.destroyInputSystem(self.inputManager)
+        # self.inputManager = None
+        #=======================================================================
 
 BciGenericRenderer.subclass = OgreRenderer
+
+
+class EventListener(ogre.FrameListener, ogre.WindowEventListener, OIS.MouseListener, OIS.KeyListener, OIS.JoyStickListener):
+    """
+    This class handles all our ogre and OIS events, mouse/keyboard/joystick
+    depending on how you initialize this class. All events are handled
+    using callbacks (buffered).
+    """
+    mouse = None
+    keyboard = None
+    joy = None
+
+    def __init__(self, renderWindow, bufferedMouse, bufferedKeys, bufferedJoy):
+
+        # Initialize the various listener classes we are a subclass from
+        ogre.FrameListener.__init__(self)
+        ogre.WindowEventListener.__init__(self)
+        OIS.MouseListener.__init__(self)
+        OIS.KeyListener.__init__(self)
+        OIS.JoyStickListener.__init__(self)
+
+        self.renderWindow = renderWindow
+
+        # Create the inputManager using the supplied renderWindow
+        windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
+        self.inputManager = OIS.createPythonInputSystem([("WINDOW",str(windowHnd))])
+
+        # Attempt to get the mouse/keyboard input objects,
+        # and use this same class for handling the callback functions.
+        # These functions are defined later on.
+
+        try:
+            if bufferedMouse:
+                self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, bufferedMouse)
+                self.mouse.setEventCallback(self)
+
+            if bufferedKeys:
+                self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, bufferedKeys)
+                self.keyboard.setEventCallback(self)
+
+            if bufferedJoy:
+                self.joy = self.inputManager.createInputObjectJoyStick(OIS.OISJoyStick, bufferedJoy)
+                self.joy.setEventCallback(self)
+
+        except Exception, e: # Unable to obtain mouse/keyboard/joy input
+            raise e
+
+        # Set this to True when we get an event to exit the application
+        self.quitApplication = False
+
+        # Listen for any events directed to the window manager's close button
+        ogre.WindowEventUtilities.addWindowEventListener(self.renderWindow, self)
+    def __del__ (self ):
+        # Clean up OIS
+        self.delInputObjects()
+        OIS.InputManager.destroyInputSystem(self.inputManager)
+        self.inputManager = None
+        ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
+
+    def delInputObjects(self):
+        # Clean up the initialized input objects
+        if self.keyboard:
+            self.inputManager.destroyInputObjectKeyboard(self.keyboard)
+        if self.mouse:
+            self.inputManager.destroyInputObjectMouse(self.mouse)
+        if self.joy:
+            self.inputManager.destroyInputObjectJoyStick(self.joy)
+
+    def frameStarted(self, evt):
+        """
+        Called before a frame is displayed, handles events
+        (also those via callback functions, as you need to call capture()
+        on the input objects)
+
+        Returning False here exits the application (render loop stops)
+        """
+        # Capture any buffered events and call any required callback functions
+        if self.keyboard:
+            self.keyboard.capture()
+        if self.mouse:
+            self.mouse.capture()
+        if self.joy:
+            self.joy.capture()
+            # joystick test
+            axes_int = self.joy.getJoyStickState().mAxes
+            axes = []
+            for i in axes_int:
+                axes.append(i.abs)
+            print axes
+
+        # Neatly close our FrameListener if our renderWindow has been shut down
+        if(self.renderWindow.isClosed()):
+            return False
+
+        return not self.quitApplication
+
+### Window Event Listener callbacks ###
+    def windowResized(self, renderWindow):
+        pass
+    def windowClosed(self, renderWindow):
+        # Only close for window that created OIS
+        if(renderWindow == self.renderWindow):
+            del self
+
+# Mouse Listener callbacks ###
+    def mouseMoved(self, frameEvent):
+        return True
+    def mousePressed(self, frameEvent, xid):
+        return True
+    def mouseReleased(self, frameEvent, xid):
+        return True
+
+### Key Listener callbacks ###
+    def keyPressed(self, evt):
+        # Quit the application if we hit the escape button
+        if evt.key == OIS.KC_ESCAPE:
+            return True
+            #self.quitApplication = True
+        if evt.key == OIS.KC_1:
+            print "hello"
+            return True
+    def keyReleased(self, evt):
+        return True
+
+### Joystick Listener callbacks ###
+    def buttonPressed(self, frameEvent, xid):
+        return True
+    def buttonReleased(self, frameEvent, xid):
+        return True
+    def axisMoved(self, frameEvent, xid):
+        return True
 
 class UberSpinningNinja(object):
     """Create a ninja!"""
@@ -421,7 +559,6 @@ class ImageStimulus(Coords.Box):
             p['flipy'] = val
         return property(fget, fset, doc='whether to display image flipped top-to-bottom')
 
-
 #size=None, position=None, anchor='center',
 #angle=0.0, color=(1,1,1,1), on=True, texture=None, use_alpha=True, smooth=True, sticky=False, flipx=False, flipy=False):
 
@@ -493,19 +630,35 @@ class Movie(ImageStimulus):
     def has_audio(self, *pargs, **kwargs): return self.__movie.has_audio(*pargs, **kwargs)
     def set_volume(self, *pargs, **kwargs): return self.__movie.set_volume(*pargs, **kwargs)
 
-class Text(ImageStimulus):
+#class Text(ImageStimulus):
+
+class Text():
+    """Docstring"""
     def __init__(self, text='Hello world', font_name=None, font_size=None, position=(10,10), color=(1, 1, 1), anchor='lower left', angle=0.0, on=True, smooth=True):
-        ImageStimulus.__init__(self, content=None, position=position, color=color, anchor=anchor, angle=angle, on=on, smooth=smooth, use_alpha=True)
-        dfn,dfs = GetDefaultFont()
-        font_name = dfn if font_name == None else font_name
-        font_size = dfs if font_size == None else font_size
-        p = self._props
-        p['font_name'] = font_name
-        p['font_size'] = font_size
-        p['text'] = text
-        p['value'] = None
-        self.__font_changed = True
-        self.__text_changed = True
+        #Create an overlay
+        ovm = ogre.OverlayManager.getSingleton()
+        overlay = ov = ovm.create("OverlayName")
+
+        #Create a panel
+        panel = ovm.createOverlayElement("Panel", "PanelName")
+        #panel.setPosition(x,y)
+        #panel.setDimensions(x,y)
+        #panel.setMaterialName("MaterialName")
+
+        #Create a text area
+        textArea = ovm.createOverlayElement("TextArea", "TextAreaName")
+        #textArea.setPosition(0, 0)
+        #textArea.setDimensions(100, 100)
+        #textArea.setCaption("Hello, World!")
+        #textArea.setCharHeight(16)
+        #textArea.setFontName("TrebuchetMSBold")
+        #textArea.setColourBottom(0.3, 0.5, 0.3)
+        #textArea.setColourTop(0.5, 0.5, 0.5)
+
+        #Put it together
+        panel.addChild(textArea)#Add the text area to the panel
+        overlay.add2D(panel)#Add the panel to the overlay
+        overlay.show()#Show the overlay
 
     def transform(self, screencoords, force=False):
         p = self._props
