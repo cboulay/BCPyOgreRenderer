@@ -1,54 +1,21 @@
-# -*- coding: utf-8 -*-
-#
-#   $Id: PygameRenderer.py 4160 2012-06-20 01:59:38Z jhill $
-#
-#   This file is part of the BCPy2000 framework, a Python framework for
-#   implementing modules that run on top of the BCI2000 <http://bci2000.org/>
-#   platform, for the purpose of realtime biosignal processing.
-#
-#   Copyright (C) 2007-11  Jeremy Hill, Thomas Schreiner,
-#                          Christian Puzicha, Jason Farquhar
-#
-#   bcpy2000@bci2000.org
-#
-#   The BCPy2000 framework is free software: you can redistribute it
-#   and/or modify it under the terms of the GNU General Public License
-#   as published by the Free Software Foundation, either version 3 of
-#   the License, or (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#   GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
 import os
 import sys
+import time
 import numpy
-
-if os.environ.get("SDL_VIDEODRIVER", "") == "":
-    if sys.platform == "win32": os.environ["SDL_VIDEODRIVER"] = "windib"
-
-import pygame
-import pygame.gfxdraw
-pygame.font.init()
+import pygame #For event monitoring
+import ogre.renderer.OGRE as ogre
+import ogre.io.OIS as OIS
 
 import AppTools.Coords as Coords
-
 try:    from BCI2000PythonApplication    import BciGenericRenderer, BciStimulus   # development copy
 except: from BCPy2000.GenericApplication import BciGenericRenderer, BciStimulus   # installed copy
 
-class PygameRenderer(BciGenericRenderer):
+class OgreRenderer(BciGenericRenderer):
 
     def __init__(self):
-        self.monofont = FindFont(
-            ('lucida console', 'monaco', 'monospace', 'courier new', 'courier')
-        )
+        #Set some defaults
         self._coords = Coords.Box(left=100, top=100, width=800, height=600, sticky=True, anchor='top left')
         self._bgcolor = (0.5, 0.5, 0.5)
         self.framerate = 60.
@@ -59,103 +26,136 @@ class PygameRenderer(BciGenericRenderer):
         self.coordinate_mapping = 'pixels from lower left' # VisionEgg-like
         self.screen = None
         self._bci = None
+        self.plugins_path = 'plugins.cfg.nt'
+        self.resource_path = 'resources.cfg'
 
     def setup(self, left = None, top = None, width = None, height = None,
         bgcolor = None, framerate = None, changemode = None,
         frameless_window = None, always_on_top = None, title=None,
         coordinate_mapping = None,
         **kwds):
-        """
-        Call this to set certain commonly-defined parameters for the screen
-        during BciApplication.Preflight(). The renderer object will read
-        these parameters in order to initialize the stimulus window, before
-        BciApplication.Initialize() is called.
-        """###
-        # `**kwds` is used for compatibility with the `VisionEggRenderer`:   # TODO: change this to explicitly take and ignore the bitdepth parameter, but investigate why this is necessary
-        # the `bitdepth` parameter is ignored.
-        if left != None: self._coords.left = left
-        if top != None: self._coords.top = top
-        if width != None: self._coords.width = width
-        if height != None: self._coords.height = height
-        if bgcolor != None: self._bgcolor = bgcolor
-        if framerate != None: self.framerate = framerate # TODO: unused
-        if changemode != None: self.changemode = changemode
-        if frameless_window != None: self.frameless_window = frameless_window
-        if always_on_top != None: self.always_on_top = always_on_top
-        if title != None: self.title = title
-        if coordinate_mapping != None:  self.coordinate_mapping = coordinate_mapping
+        #Set any constants that may come from the GUI parameters.
+        pass
 
     def Initialize(self, bci=None):
         self._bci = bci
-        pygame.display.quit()
-        os.environ["SDL_VIDEO_WINDOW_POS"] = "%i,%i" % (int(self._coords.left), int(self._coords.top))
-        pygame.display.init()
-        pygame.display.set_caption(self.title)
-        iconfile = os.path.join(os.path.split(__file__)[0], 'icon.bmp')
-        if os.path.exists(iconfile): pygame.display.set_icon(pygame.image.load(iconfile))
-        if self.changemode: flags = pygame.FULLSCREEN | pygame.DOUBLEBUF
-        elif self.frameless_window: flags = pygame.NOFRAME
-        else: flags = 0
-        size = (int(self._coords.width), int(self._coords.height))
-        self.screen = pygame.display.set_mode(size, flags)
-        self._blank = self.screen.copy()
-        self.bgcolor = self.bgcolor
+        #Renderer GO
+        self.createRoot()
+        self.defineResources()
+        self.setupRenderSystem()
+        self.createRenderWindow()
+        self.initializeResourceGroups()
+        self.setupScene()
+        #self.setupInputSystem()
+        #self.setupCEGUI()
+        #self.createFrameListener()
 
-        self._coords.sticky = True
-        self._coords.anchor = 'top left'
-        self._coords.position = [0,0]
-        self._coords.size = [size[0], -size[1]]
-        cm = self.coordinate_mapping.lower().replace('bottom', 'lower').replace('top', 'upper').replace(' ', '')
+    # The Root constructor for the ogre
+    def createRoot(self):
+        self.root = ogre.Root(self.plugins_path)
 
-        if cm == 'pixelsfromlowerleft':
-            self._coords.internal = Coords.Box(left=0, bottom=0, width=size[0], height=size[1])
-        elif cm == 'pixelsfromupperleft':
-            self._coords.internal = Coords.Box(left=0, top=0, width=size[0], height=-size[1])
-        elif cm == 'pixelsfromcenter':
-            self._coords.internal = Coords.Box(left=-size[0]/2.0, bottom=-size[1]/2.0, width=size[0], height=size[1])
-        elif cm == 'normalizedfromcenter':
-            self._coords.internal = Coords.Box(left=-0.5, bottom=-0.5, width=1.0, height=1.0) # TODO: this doesn't work
-        else:
-            raise ValueError('coordinate_mapping "%s" is unsupported' % self.coordinate_mapping)
+    # Here the resources are read from the resources.cfg
+    def defineResources(self):
+        cf = ogre.ConfigFile()
+        cf.load(self.resource_path)
 
-        HWND_TOPMOST = -1; HWND_NOTOPMOST = -2; SWP_NOSIZE = 0x0001; SWP_NOMOVE = 0x0002
-        zorder = {False:HWND_NOTOPMOST, True:HWND_TOPMOST}[bool(self.always_on_top)]
+        seci = cf.getSectionIterator()
+        while seci.hasMoreElements():
+            secName = seci.peekNextKey()
+            settings = seci.getNext()
+
+            for item in settings:
+                typeName = item.key
+                archName = item.value
+                ogre.ResourceGroupManager.getSingleton().addResourceLocation(archName, typeName, secName)
+
+    # Create and configure the rendering system (either DirectX or OpenGL) here
+    def setupRenderSystem(self):
+        if not self.root.restoreConfig() and not self.root.showConfigDialog():
+            raise Exception("User canceled the config dialog -> Application.setupRenderSystem()")
+
+    # Create the render window
+    def createRenderWindow(self):
+        self.root.initialise(True, "Tutorial Render Window")
+        self.window = self.root.getAutoCreatedWindow()
+        self.window.setDeactivateOnFocusChange(False)
+
+    # Initialize the resources here (which were read from resources.cfg in defineResources()
+    def initializeResourceGroups(self):
+        ogre.TextureManager.getSingleton().setDefaultNumMipmaps(5)
+        ogre.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+
+    # Now, create a scene here. Three things that MUST BE done are sceneManager, camera and
+    # viewport initializations
+    def setupScene(self):
+        sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
+        #sceneManager.ambientLight = 0.25, 0.25, 0.25
+        sceneManager.setAmbientLight(ogre.ColourValue(1, 1, 1))
+
+        camera = sceneManager.createCamera("Camera")
+        camera.setPosition(0, 100, 500)
+        camera.lookAt(ogre.Vector3(0, 25, 0))
+        camera.setNearClipDistance(15)
+
+        viewPort = self.root.getAutoCreatedWindow().addViewport(camera)
+        viewPort.setBackgroundColour(ogre.ColourValue(0, 0, 0))
+        self.viewPort = viewPort
+
+        ent = sceneManager.createEntity("Hand", "hand.mesh")
+        node = sceneManager.getRootSceneNode().createChildSceneNode("HandNode")
+        node.attachObject(ent)
+        node.setScale(50,50,50)
+        self.hand = node
+        #self.hand.yaw(.002)
+
+        light = sceneManager.createLight("Light1")
+        light.type = ogre.Light.LT_POINT
+        light.position = 250, 150, 250
+        light.diffuseColour = 1, 1, 1
+        light.specularColour = 1, 1, 1
+
+    # here setup the input system (OIS is the one preferred with Ogre3D)
+    def setupInputSystem(self):
+        windowHandle = 0
+        renderWindow = self.root.getAutoCreatedWindow()
+        windowHandle = renderWindow.getCustomAttributeInt("WINDOW")
+        paramList = [("WINDOW", str(windowHandle))]
+        self.inputManager = OIS.createPythonInputSystem(paramList)
+
+        # Now InputManager is initialized for use. Keyboard and Mouse objects
+        # must still be initialized separately
         try:
-            import ctypes
-            window = pygame.display.get_wm_info()['window']
-            ctypes.windll.user32.SetWindowPos(window, zorder, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE)
-            # ripped from wm_ext by John Popplewell
-        except:
-            pass
+            self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, False)
+            self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, False)
+        except Exception, e:
+            raise e
 
     def GetFrameRate(self):
         return self.framerate  # TODO: not the real framerate
 
     def RaiseWindow(self):
         try:
-            stimwin = pygame.display.get_wm_info()['window']
-            self._bci._raise_window(stimwin)
+            pass
+            #stimwin = pygame.display.get_wm_info()['window']
+            #self._bci._raise_window(stimwin)
         except:
             pass
 
     def GetEvents(self):
-        return pygame.event.get()
+        return []
+        #return pygame.event.get()
 
     def DefaultEventHandler(self, event):
-        return (event.type == pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
+        return False
+        #return (event.type == pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
 
     def StartFrame(self, objlist):
-        bci = self._bci
-        if bci: bci.ftdb(label='screen.clear')  #--------------------
-        #self.screen.fill(tuple([int(round(255 * x)) for x in self._bgcolor]))
-        self.screen.blit(self._blank, (0,0))
-        if bci: bci.ftdb(label='viewport.draw') #--------------------
-        for obj in objlist: obj.draw(self.screen, self._coords)
+        ogre.WindowEventUtilities().messagePump()
+        self.root.renderOneFrame()
+        time.sleep(.0001)
 
     def FinishFrame(self):
-        bci = self._bci
-        if bci: bci.ftdb(label='swap_buffers')  #--------------------
-        pygame.display.flip()
+        pass
 
     def SetDefaultFont(self, name = None, size = None):
         return SetDefaultFont(name=name, size=size)
@@ -165,11 +165,7 @@ class PygameRenderer(BciGenericRenderer):
 
     @property
     def size(self):
-        try:
-            info = pygame.display.Info()
-        except:
-            return (0,0)
-        return Coords.Size((info.current_w, info.current_h))
+        return (0,0)
 
     @property
     def width(self): return self.size[0]
@@ -183,15 +179,38 @@ class PygameRenderer(BciGenericRenderer):
             return self._bgcolor
         def fset(self, value):
             self._bgcolor = value
-            self._blank.fill(tuple([int(round(255 * x)) for x in self._bgcolor]))
+            self.viewPort.setBackgroundColour(self._bgcolor)
         return property(fget, fset)
     color=bgcolor
 
     def Cleanup(self):
-        self.screen = None
-        pygame.display.quit()
+        self.root.shutdown()
 
-BciGenericRenderer.subclass = PygameRenderer
+BciGenericRenderer.subclass = OgreRenderer
+
+class UberSpinningNinja(object):
+    """Create a ninja!"""
+    def __init__(self, app, node, start_coords):
+        self.entity = app.sm.createEntity('ninja', 'ninja.mesh')
+        self.node = node.createChildSceneNode("ninja_node", start_coords)
+        self.node.attachObject(self.entity)
+        #self.node.setScale(50,50,50)
+
+        src = self.node.Orientation * (ogre.Vector3().UNIT_Z)
+        directionToGo = ogre.Vector3(0,0,-1)
+        quat = src.getRotationTo(directionToGo)
+        self.node.Orientation=quat
+
+        self.spinning_x = 0 # 1 for clockwise, -1 for counter clockwise
+
+    def start_spinning(self, clock_wise=1):
+        self.spinning_x = clock_wise
+
+    def stop_spinning(self):
+        self.spinning_x = 0
+
+    def update(self):
+        self.node.yaw(.002 * self.spinning_x)
 
 class ImageStimulus(Coords.Box):
     def __init__(self, content=None, size=None, position=None, anchor='center',
@@ -588,7 +607,6 @@ def GetDefaultFont():
     return Text.default_font_name, Text.default_font_size
 
 SetDefaultFont(name=pygame.font.get_default_font(), size=20)
-
 
 def to_surface(src):
     if isinstance(src, pygame.surface.Surface):
