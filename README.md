@@ -27,6 +27,7 @@ Here I will keep some notes to help me keep track of how things get initialized.
 
 ### BCI2000 stage
 BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unreadable to me, but I found a few things in PythonFilter.cpp that might help me understand what's going on.
+
 1. `Py_Initialize()`
 2. `PyEval_InitThreads()`
 3. EvalPythonString to import core and generic modules
@@ -120,6 +121,7 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
 
 ### Rendering
 In the case of VisionEggRenderer
+
 1. myApp._update_stimlist()
     1. Runs itself on each of _stimq
     2. Each _stimq z-val is inserted into self._stimz at the appropriate index for its z-val, and the stim object itself is inserted into self._stimlist at the appropriate index
