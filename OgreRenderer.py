@@ -1,4 +1,10 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
+#TODO: ImageStimulus
+#TODO: Block
+#TODO: Disc
+#TODO: Keyboard events passed to application
+#TODO: Framerate
+#TODO: Fonts
 
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
@@ -6,7 +12,6 @@ import os
 import sys
 import time
 import numpy
-import pygame #For event monitoring
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
 
@@ -28,17 +33,17 @@ class OgreRenderer(BciGenericRenderer):
         self.coordinate_mapping = 'pixels from lower left' # VisionEgg-like
         self.screen = None
         self._bci = None
-        self.plugins_path = 'plugins.cfg.nt'
-        self.resource_path = 'resources.cfg'
 
     def setup(self, left = None, top = None, width = None, height = None,
         bgcolor = None, framerate = None, changemode = None,
         frameless_window = None, always_on_top = None, title=None,
         coordinate_mapping = None,
+        plugins_path = 'plugins.cfg.nt', resource_path = 'resources.cfg',
         **kwds):
         #Set any constants that may come from the parameters.
         #Called during application preflight on the main thread
-        pass
+        self.plugins_path = plugins_path
+        self.resource_path = resource_path
 
     def Initialize(self, bci=None):
         #Called after generic preflights, after generic _Initialize, but before application Initialize
@@ -50,7 +55,8 @@ class OgreRenderer(BciGenericRenderer):
         self.createRenderWindow()
         self.initializeResourceGroups()
         self.setupScene()
-        self.createFrameListener()
+        #self.createFrameListener()
+        #self.setupInputSystem()
 
     # The Root constructor for the ogre
     def createRoot(self):
@@ -78,7 +84,7 @@ class OgreRenderer(BciGenericRenderer):
 
     # Create the render window
     def createRenderWindow(self):
-        self.root.initialise(True, "Tutorial Render Window")
+        self.root.initialise(True, self.title)
         self.renderWindow = self.root.getAutoCreatedWindow()
         self.renderWindow.setDeactivateOnFocusChange(False)
 
@@ -93,13 +99,13 @@ class OgreRenderer(BciGenericRenderer):
         #Create and configure the scene manager
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
         self.sceneManager.setAmbientLight(ogre.ColourValue(0.7, 0.7, 0.7))
-        self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
-        self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0002)
+        #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
+        self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
 
         #Create and configure the camera
         self.camera = self.sceneManager.createCamera("Camera")
-        self.camera.setPosition( ogre.Vector3(0, 100, -400) )
-        self.camera.lookAt( ogre.Vector3(0, 25, 1) )
+        self.camera.setPosition( ogre.Vector3(0, 0, -400) )
+        self.camera.lookAt( ogre.Vector3(0, 0, 0) )
         self.camera.setNearClipDistance(15)
 
         #Create and configure the viewPort
@@ -109,23 +115,31 @@ class OgreRenderer(BciGenericRenderer):
         #Add a light source
         light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        light.position = 20, 80, 50 #light.setPosition ( ogre.Vector3(20, 80, 50) )
-        #light.diffuseColour = 1, 1, 1
-        #light.specularColour = 1, 1, 1
+        light.setPosition ( ogre.Vector3(20, 80, 50) )
+        light.diffuseColour = 1, 1, 1
+        light.specularColour = 1, 1, 1
 
-        #Add an entity
-        self.entityHand = self.sceneManager.createEntity("Hand", "hand.mesh")
-        self.nodeHand = self.sceneManager.getRootSceneNode().createChildSceneNode("HandNode")
-        self.nodeHand.attachObject(self.entityHand)
-        self.nodeHand.setScale(50,50,50)
-        #Try something like self.nodeHand.yaw(.2) while the app is running
+    # here setup the input system (OIS is the one preferred with Ogre3D)
+    def setupInputSystem(self):
+        windowHandle = self.renderWindow.getCustomAttributeInt("WINDOW")
+        paramList = [("WINDOW", str(windowHandle))]
+        self.inputManager = OIS.createPythonInputSystem(paramList)
+        # Now InputManager is initialized for use. Keyboard and Mouse objects
+        # must still be initialized separately
+        try:
+            self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, False)
+            self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, False)
+        except Exception, e:
+            raise e
 
-    def createFrameListener(self):
-        self.eventListener = EventListener(self.renderWindow, True, True, False) # switch the final "False" into "True" to get joystick support
-        self.root.addFrameListener(self.eventListener)
+    #===========================================================================
+    # def createFrameListener(self):
+    #    self.eventListener = EventListener(self.renderWindow, True, True, False) # switch the final "False" into "True" to get joystick support
+    #    self.root.addFrameListener(self.eventListener)
+    #===========================================================================
 
     def GetFrameRate(self):
-        return self.framerate  # TODO: not the real framerate
+        return self.framerate#self.renderWindow.getLastFPS()
 
     def RaiseWindow(self):
         try:
@@ -136,12 +150,13 @@ class OgreRenderer(BciGenericRenderer):
             pass
 
     def GetEvents(self):
+        #self.keyboard.capture()
+        #But we have to check every key
+        #self.mouse.capture()
         #This is called on every visual display iteration
         #Return an array of events
         #Each item in the array is passed to myBCPyApplication.Event
-        #TODO: Move the keyboard/mouse/joystick capture from EventListener to here.
         return []
-        #return pygame.event.get()
 
     def DefaultEventHandler(self, event):
         return False
@@ -165,12 +180,12 @@ class OgreRenderer(BciGenericRenderer):
 
     @property
     def size(self):
-        return (0,0)
+        return (self.width,self.height)
 
     @property
-    def width(self): return self.size[0]
+    def width(self): return self.viewPort.getActualWidth()
     @property
-    def height(self): return self.size[1]
+    def height(self): return self.viewPort.getActualHeight()
     def get_size(self): return self.size
 
     @property
@@ -184,14 +199,14 @@ class OgreRenderer(BciGenericRenderer):
     color=bgcolor
 
     def Cleanup(self):
-        del self.eventListener
-        self.root.shutdown()
+        #del self.eventListener
         #=======================================================================
         # self.inputManager.destroyInputObjectKeyboard(self.keyboard)
         # self.inputManager.destroyInputObjectMouse(self.mouse)
         # OIS.InputManager.destroyInputSystem(self.inputManager)
         # self.inputManager = None
         #=======================================================================
+        self.root.shutdown()
 
 BciGenericRenderer.subclass = OgreRenderer
 
@@ -326,31 +341,28 @@ class EventListener(ogre.FrameListener, ogre.WindowEventListener, OIS.MouseListe
     def axisMoved(self, frameEvent, xid):
         return True
 
-class UberSpinningNinja(object):
-    """Create a ninja!"""
-    def __init__(self, app, node, start_coords):
-        self.entity = app.sm.createEntity('ninja', 'ninja.mesh')
-        self.node = node.createChildSceneNode("ninja_node", start_coords)
+class MeshObject(object):
+    """Ogre object"""
+    def __init__(self, screen=None, mesh_name='hand.mesh', node=None, position=(0,0,0)):
+        """Create a MeshObject. screen is the renderer, node is a parent node, position is where, relative to parent, to place."""
+        sm = screen.sceneManager
+        self.entity = sm.createEntity(mesh_name + 'Entity', mesh_name)
+        node = node if node else sm.getRootSceneNode()
+        self.node = node.createChildSceneNode(mesh_name + 'Node', position)
         self.node.attachObject(self.entity)
-        #self.node.setScale(50,50,50)
-
-        src = self.node.Orientation * (ogre.Vector3().UNIT_Z)
-        directionToGo = ogre.Vector3(0,0,-1)
-        quat = src.getRotationTo(directionToGo)
-        self.node.Orientation=quat
-
-        self.spinning_x = 0 # 1 for clockwise, -1 for counter clockwise
-
-    def start_spinning(self, clock_wise=1):
-        self.spinning_x = clock_wise
-
-    def stop_spinning(self):
-        self.spinning_x = 0
-
-    def update(self):
-        self.node.yaw(.002 * self.spinning_x)
+        #=======================================================================
+        # src = self.node.Orientation * (ogre.Vector3().UNIT_Z)
+        # directionToGo = ogre.Vector3(0,0,-1)
+        # quat = src.getRotationTo(directionToGo)
+        # self.node.Orientation=quat
+        #=======================================================================
 
 class ImageStimulus(Coords.Box):
+    #From shapes
+    #ImageStimulus(texture=canvas, size=size, anchor=anchor, position=position, color=color[:3], **kwargs)
+    #Where canvas is Image.new("RGBA", csize, (0,0,0,0)) from PIL
+    #We need to take the properties of the texture to create an object,
+    #then apply the texture
     def __init__(self, content=None, size=None, position=None, anchor='center',
         angle=0.0, color=(1,1,1,1), on=True, texture=None, use_alpha=True, smooth=True, sticky=False, flipx=False, flipy=False):
 
@@ -391,176 +403,6 @@ class ImageStimulus(Coords.Box):
         self.flipy = flipy
         self.on = on
 
-    def default_content(self, size):
-        return pygame.Surface(size, flags=pygame.SRCALPHA)
-
-
-    def transform(self, screencoords=None, force=False):
-        p = self._props
-        srcsize  = tuple([int(round(x)) for x in self.original_size])
-        dstsize  = tuple([int(round(x)) for x in self.size])
-        angle = float(p['angle']) % 360.0
-        smooth = bool(p['smooth'])
-        changed = bool(self.__content_changed)
-        flipx = bool(p['flipx'])
-        flipy = bool(p['flipy'])
-        color = tuple(p['color'])
-        if len(color) == 3: color = color + (1.0,)
-        athresh = 0.2 # degrees
-        pos = Coords.Point((self.left, self.top))
-        origin = pos
-
-        origin = Coords.Point(self.anchor.through(self))
-        if screencoords != None:
-            pos     = screencoords.int2ext(pos, 'position')
-            origin  = screencoords.int2ext(origin, 'position')
-            #dstsize = tuple([abs(x) for x in screencoords.int2ext(dstsize, 'size')])   # for now, let's express size as an absolute size in pixels even if position coords are on some other scale
-            # TODO: the previous couple of lines seem to use up a lot of CPU...
-
-        # now we're working in pixels from top left
-        ptr = (tuple(pos),tuple(origin),tuple(dstsize),angle)
-        if ptr == self.__last_ptr:
-            pos = self.__last_transformed_pos
-        else:
-            r = numpy.exp(-1.0j * angle * numpy.pi/180.0)
-            def rotate(p, r, origin):
-                p = p - origin
-                c = (float(p[0]) + p[1]*1.0j) * r
-                p[:] = c.real,c.imag
-                p = p + origin
-                return p
-            w,h = dstsize
-            corners = [rotate(pos+x, r, origin) for x in [(0,0),(0,h),(w,h),(w,0)]]
-            #print "pos =",pos
-            #print "origin =",origin
-            #print "corners =",corners
-            x,y = zip(*corners)
-            pos[:] = min(x),min(y)
-            #print "transformed_pos =",pos
-            #print
-            self.__last_ptr = ptr
-            self.__last_transformed_pos = pos
-
-        tr = (tuple(srcsize),tuple(dstsize),angle,flipx,flipy,smooth)
-        if force or changed or tr != self.__last_transformation:
-            t = self.__original_surface
-            if flipx or flipy: t = pygame.transform.flip(t, flipx, flipy)
-            if smooth:
-                scaling = [float(dstsize[i]) / float(srcsize[i]) for i in (0,1)]
-                proportional = (abs(scaling[0]-scaling[1]) < 1e-2)
-                if dstsize != srcsize and not proportional: t = pygame.transform.smoothscale(t, dstsize)
-                elif  dstsize != srcsize  and proportional: t = pygame.transform.rotozoom(t, angle, scaling[0])
-                elif  abs(angle) > athresh:				 t = pygame.transform.rotozoom(t, angle, 1.0)
-            else:
-                if dstsize != srcsize: t = pygame.transform.scale(t, dstsize)
-                if abs(angle) > athresh:   t = pygame.transform.rotate(t, -angle)
-            self.__colored_surface = self.__transformed_surface = t
-            changed = True
-        self.__last_transformation = tr
-        if force or changed or color != self.__last_coloring:
-            t = self.__transformed_surface
-            if color != (1.0,1.0,1.0,1.0):
-                t = to_numpy(t)
-                a = numpy.array(color[:t.shape[2]])
-                a.shape = (1,1,a.size)
-                t = to_surface(t * a)
-            self.__colored_surface = t
-        self.__last_coloring = color
-        self.__content_changed = False
-        return self.__colored_surface, pos
-
-    def draw(self, screen, screencoords):
-        if not self._props['on']: return
-        t, pos = self.transform(screencoords=screencoords)
-        screen.blit(t, pos)
-
-    @apply
-    def original_size():
-        def fget(self):
-            orig = self.__original_surface
-            if orig == None: return None
-            return Coords.Size((orig.get_width(), orig.get_height()))
-        return property(fget, doc="the width and height of the original image (read only)")
-
-    @apply
-    def content():
-        def fget(self):
-            return to_numpy(self.__original_surface)
-        def fset(self, val):
-            if isinstance(val, basestring):
-                val = pygame.image.load(val)
-                self.__filename = val
-            else:
-                val = to_surface(val)
-            if self.__use_alpha: val = val.convert_alpha()
-            elif val.get_flags() & pygame.SRCALPHA: val = val.convert()
-            self.__original_surface = val
-            self.__content_changed = True
-        return property(fget, fset, doc='the content of the image stimulus as a numpy array')
-
-    @apply
-    def color():
-        def fget(self):  p = self._props; return p['color']
-        def fset(self, val):
-            p = self._props;
-            try: val = [float(x) for x in val]
-            except: raise ValueError('invalid color specification')
-            if len(val) not in [3,4]: raise ValueError('color specification should have 3 or 4 elements')
-            p['color'] = val
-        return property(fget, fset, doc='3- or 4-element sequence denoting RGB or RGBA colour')
-
-    @apply
-    def angle():
-        def fget(self):  p = self._props; return p['angle']
-        def fset(self, val):
-            try: val = float(val)
-            except: raise TypeError('angle should be a floating-point scalar')
-            p = self._props;
-            p['angle'] = val % 360.0
-        return property(fget, fset, doc='rotation angle in degrees')
-
-    @apply
-    def smooth():
-        def fget(self):  p = self._props; return p['smooth']
-        def fset(self, val):
-            try: val = bool(val)
-            except: raise TypeError('smooth should be a boolean')
-            p = self._props;
-            p['smooth'] = val
-        return property(fget, fset, doc='whether or not pygame transformations are smooth')
-
-    @apply
-    def on():
-        def fget(self):  p = self._props; return p['on']
-        def fset(self, val):
-            try: val = bool(val)
-            except: raise TypeError('on should be a boolean')
-            p = self._props;
-            p['on'] = val
-        return property(fget, fset, doc='whether or not the stimulus is displayed')
-
-    @apply
-    def flipx():
-        def fget(self):  p = self._props; return p['flipx']
-        def fset(self, val):
-            try: val = bool(val)
-            except: raise TypeError('flipx should be a boolean')
-            p = self._props;
-            p['flipx'] = val
-        return property(fget, fset, doc='whether to display image flipped left-to-right')
-
-    @apply
-    def flipy():
-        def fget(self):  p = self._props; return p['flipy']
-        def fset(self, val):
-            try: val = bool(val)
-            except: raise TypeError('flipy should be a boolean')
-            p = self._props;
-            p['flipy'] = val
-        return property(fget, fset, doc='whether to display image flipped top-to-bottom')
-
-#size=None, position=None, anchor='center',
-#angle=0.0, color=(1,1,1,1), on=True, texture=None, use_alpha=True, smooth=True, sticky=False, flipx=False, flipy=False):
 
 class Disc(ImageStimulus):
     def __init__(self, position=(10,10), radius=10, size=None, color=(0,0,1), **kwargs):
@@ -591,6 +433,7 @@ class Disc(ImageStimulus):
         return property(fget, fset, doc="radius of the circle")
 
 class Block(ImageStimulus):
+    #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
     def __init__(self, position=(10, 10), size=(10, 10), color=(0, 0, 1), **kwargs):
         kwargs.update({'position':position, 'size':size, 'color':color})
         ImageStimulus.__init__(self, content=None, **kwargs)
@@ -630,117 +473,160 @@ class Movie(ImageStimulus):
     def has_audio(self, *pargs, **kwargs): return self.__movie.has_audio(*pargs, **kwargs)
     def set_volume(self, *pargs, **kwargs): return self.__movie.set_volume(*pargs, **kwargs)
 
-#class Text(ImageStimulus):
-
-class Text():
+class Text(object):
     """Docstring"""
     def __init__(self, text='Hello world', font_name="BlueHighway",\
                   font_size=16, position=(10,10), color=(1, 1, 1), anchor='lower left', angle=0.0, on=True, smooth=True):
         #Create an overlay
         ovm = ogre.OverlayManager.getSingleton()
-        overlay = ovm.create("OverlayName")
+        ix = 0
+        overlayname = 'Overlay_' + str(ix)
+        while ovm.getByName(overlayname):
+            ix += 1
+            overlayname = 'Overlay_' + str(ix)
+        overlay = ovm.create(overlayname)
 
         #Create a panel
-        panel = ovm.createOverlayElement("Panel", "PanelName")
+        panel = ovm.createOverlayElement("Panel", 'Panel_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
-        panel.setPosition(*position)
-        panel.setDimensions(400,400)
         panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
 
         #Create a text area
-        textArea = ovm.createOverlayElement("TextArea", "TextAreaName")
+        textArea = ovm.createOverlayElement("TextArea", 'TextArea_' + str(ix))
         textArea.setMetricsMode(ogre.GMM_PIXELS)
         textArea.setPosition(0, 0)
-        textArea.setDimensions(100, 100)
-        textArea.setCaption(text)
-        textArea.setCharHeight(font_size)
-        textArea.setFontName(font_name)
-        textArea.setColourTop( ogre.ColourValue(1.0, 1.0, 1.0) )
-        textArea.setColourBottom( ogre.ColourValue(1.0, 1.0, 1.0) )
+        textArea.setVerticalAlignment( ogre.GVA_TOP )
 
         #Put it together
         overlay.add2D(panel)#Add the panel to the overlay
         panel.addChild(textArea)#Add the text area to the panel
-        if on: overlay.show()#Show the overlay
 
         self.overlay = overlay
         self.panel = panel
         self.textArea = textArea
 
-    #Define the following properties:
-    #value
-    #text
-    #font_name
-    #font_size
-    #on
-    #color
-    #angle
-    #smooth
-    #flipx
-    #flipy
+        #Now update its properties based on input. User property setters where possible.
+        self.anchor = anchor
+        self.text = text
+        self.font_name = font_name
+        self.font_size = font_size
+        self.color = color
+        self.size = (len(text)*font_size/(16.0/6),font_size)
+        self.position = position
+        self.on = on
 
-#===============================================================================
-#    def transform(self, screencoords, force=False):
-#        p = self._props
-#        if self.__font_changed:
-#            fn = FindFont(p['font_name'])
-#            if fn != None: self.__font_object = pygame.font.Font(fn, p['font_size'])
-#            self.__font_changed = False
-#            self.__text_changed = True
-#        if self.__text_changed:
-#            t = str(p['text'])
-#            if p['value'] != None:
-#                val = p['value']
-#                if isinstance(val, list): val = tuple(val)
-#                try: t = t % val
-#                except: pass
-#            orig = self.__font_object.render(t, True, (255,255,255)) # TODO: multiline text....
-#            self.__text_changed = False
-#            self.size = Coords.Size((orig.get_width(), orig.get_height()))
-#            self.content = orig
-#        return ImageStimulus.transform(self, screencoords=screencoords, force=force)
-#
-#    @apply
-#    def value():
-#        def fget(self):  p = self._props; return p['value']
-#        def fset(self, val):
-#            if isinstance(val, (tuple,list,numpy.ndarray)): val = list(val)
-#            p = self._props;
-#            self.__text_changed = p['value'] != val
-#            p['value'] = val
-#        return property(fget, fset, doc='optional list of values for interpolation into text')
-#
-#    @apply
-#    def text():
-#        def fget(self):  p = self._props; return p['text']
-#        def fset(self, val):
-#            if val == None or val == '': val = ' '
-#            p = self._props;
-#            self.__text_changed = p['text'] != val
-#            p['text'] = val
-#        return property(fget, fset, doc='text content')
-#
-#    @apply
-#    def font_name():
-#        def fget(self):  p = self._props; return p['font_name']
-#        def fset(self, val):
-#            p = self._props;
-#            self.__font_changed = p['font_name'] != val
-#            p['font_name'] = val
-#        return property(fget, fset, doc='font name')
-#
-#    @apply
-#    def font_size():
-#        def fget(self):  p = self._props; return p['font_size']
-#        def fset(self, val):
-#            p = self._props;
-#            self.__font_changed = p['font_size'] != val
-#            p['font_size'] = val
-#        return property(fget, fset, doc='font size')
-#
-#    def _getAttributeNames(self):
-#       return self._props.keys()
-#===============================================================================
+    #Positional values for the panel
+    @property
+    def left(self):
+        return self.panel.getLeft()
+    @left.setter
+    def left(self, value):
+        self.panel.setLeft(value)
+    @property
+    def right(self):
+        return self.left + self.width
+    @right.setter
+    def right(self, value):
+        self.left = value - self.width
+    @property
+    def top(self):
+        return self.panel.getTop()
+    @top.setter
+    def top(self, value):
+        self.panel.setTop(value)
+    @property
+    def bottom(self):
+        return self.top + self.height
+    @bottom.setter
+    def bottom(self, value):
+        self.panel.setTop(value - self.height)
+    @property
+    def width(self):
+        return self.panel.getWidth()
+    @width.setter
+    def width(self, value):
+        self.panel.setWidth(value)
+    @property
+    def height(self):
+        return self.panel.getHeight()
+    @height.setter
+    def height(self, value):
+        self.panel.setHeight(value)
+    @property
+    def size(self):
+        """Bounding panel size"""
+        return (self.width, self.height)
+    @size.setter
+    def size(self, value):
+        self.panel.setDimensions(*value)
+
+    #positional values for the panel's anchor
+    @property
+    def position(self):
+        return Coords.Point([self.x, self.y])
+    @position.setter
+    def position(self, value):
+        pos = Coords.Point(value)
+        self.x = pos.x
+        self.y = pos.y
+    @property
+    def x(self):
+        return self.right if self.anchor == 'right' else self.left
+    @x.setter
+    def x(self, value):
+        if self.anchor == 'right':
+            self.right = value
+        else:
+            self.left = value
+    @property
+    def y(self):
+        return self.top
+    @y.setter
+    def y(self, value):
+        self.top = value
+
+    @property
+    def color(self):
+        """Text color"""
+        col = self.textArea.getColourTop()
+        return (col.r, col.g, col.b, col.a)
+    @color.setter
+    def color(self, value):
+        self.textArea.setColourTop( ogre.ColourValue(*value) )
+        self.textArea.setColourBottom( ogre.ColourValue(*value) )
+
+    @property
+    def text(self):
+        """Text"""
+        return self.textArea.getCaption()
+    @text.setter
+    def text(self, text):
+        self.textArea.setCaption(text)
+
+    @property
+    def font_size(self):
+        """Font Size"""
+        return self.textArea.getCharHeight()
+    @font_size.setter
+    def font_size(self, value):
+        self.textArea.setCharHeight(value)
+
+    @property
+    def font_name(self):
+        """Font Name"""
+        return self.textArea.getFontName()
+    @font_name.setter
+    def font_name(self, value):
+        self.textArea.setFontName(value)
+
+    @property
+    def on(self):
+        """Hidden or not"""
+        return self.panel.isVisible()
+    @on.setter
+    def on(self, value):
+        if value: self.overlay.show()
+        else: self.overlay.hide()
 
 def FindFont(fontnames):
     """
@@ -780,7 +666,7 @@ def SetDefaultFont(name = None, size = None):
 def GetDefaultFont():
     return Text.default_font_name, Text.default_font_size
 
-SetDefaultFont(name=pygame.font.get_default_font(), size=20)
+#SetDefaultFont(name=pygame.font.get_default_font(), size=20)
 
 def to_surface(src):
     if isinstance(src, pygame.surface.Surface):

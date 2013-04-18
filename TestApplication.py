@@ -1,5 +1,7 @@
 import numpy
 import OgreRenderer
+import ogre.io.OIS as OIS
+from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 
 #################################################################
 #################################################################
@@ -43,12 +45,18 @@ class BciApplication(BciGenericApplication):
 
         Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
                                          # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
+        Mesh = OgreRenderer.MeshObject
         #w,h = self.screen.size
         #self.screen.SetDefaultFont('comic sans ms', 30)
         self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
-                                        position=(100, 100),
-                                        anchor='top'         )
-        #self.color = numpy.array([1.0, 0.0, 0.0])
+                                        position=(300, 100),
+                                        anchor='right'         )
+        self.stimulus('hand', Mesh, screen=self.screen, mesh_name='hand.mesh')
+        self.stimuli['hand'].node.setScale(50,50,50)
+        self.color = numpy.array([1.0, 0.0, 0.0])
+        #b = box(size=siz, position=(scrw/2.0,scrh/2.0 - siz[1]/6.0), sticky=True)
+        #triangle = PolygonTexture(frame=b, vertices=((0,1),(1,1),(0.5,0)), color=(0,0,0,0.5))
+        addstatemonitor(self, 'Running', showtime=True)
 
     #############################################################
 
@@ -86,16 +94,14 @@ class BciApplication(BciGenericApplication):
         # update stimulus parameters if they need to be animated on a frame-by-frame basis
         intensity = 0.5 + 0.5 * numpy.sin(2.0 * numpy.pi * 0.5 * self.since('run')['msec']/1000.0)
         self.screen.bgcolor = intensity * self.color
+        self.stimuli['hand'].node.yaw(0.02)
 
     #############################################################
 
     def Event(self, phase, event):
-        # respond to pygame keyboard and mouse events
-        import pygame.locals
-        if event.type == pygame.locals.KEYDOWN:
-            if event.key == ord('r'): self.color[:] = [1,0,0]
-            if event.key == ord('g'): self.color[:] = [0,1,0]
-            if event.key == ord('b'): self.color[:] = [0,0,1]
+        # respond to OIS events
+        if event.isKeyDown(OIS.KC_ESCAPE):
+            print "Escape Pressed"
 
     #############################################################
 
