@@ -12,6 +12,8 @@ My [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) implementation 
 Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.6.4%20SnapShot/Python-Ogre-Core-1.6.4-r1017-py263.7z/download) compatible with Python 2.6.
 [Install instructions](http://www.cse.unr.edu/~sushil/class/381/ware/pythonOgreWin7Install.pdf).
 
+You will have to edit your plugins.cfg and resources.cfg file so they point to where your resources are stored.
+
 ## Virtual Hand
 
 One reason for using a 3D engine is that I would like to use BCPy2000 to
