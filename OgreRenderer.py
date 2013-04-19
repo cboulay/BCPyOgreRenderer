@@ -8,14 +8,13 @@
 
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
-import os
-import sys
+#import os
+#import sys
 import time
-import numpy
+#import numpy
 import ogre.renderer.OGRE as ogre
-import ogre.io.OIS as OIS
 
-import AppTools.Coords as Coords
+import BCPy2000.AppTools.Coords as Coords
 try:    from BCI2000PythonApplication    import BciGenericRenderer, BciStimulus   # development copy
 except: from BCPy2000.GenericApplication import BciGenericRenderer, BciStimulus   # installed copy
 
@@ -30,14 +29,12 @@ class OgreRenderer(BciGenericRenderer):
         self.frameless_window = False
         self.always_on_top = False
         self.title = 'stimuli'
-        self.coordinate_mapping = 'pixels from lower left' # VisionEgg-like
         self.screen = None
         self._bci = None
 
     def setup(self, left = None, top = None, width = None, height = None,
         bgcolor = None, framerate = None, changemode = None,
         frameless_window = None, always_on_top = None, title=None,
-        coordinate_mapping = None,
         plugins_path = 'plugins.cfg.nt', resource_path = 'resources.cfg',
         **kwds):
         #Set any constants that may come from the parameters.
@@ -115,28 +112,9 @@ class OgreRenderer(BciGenericRenderer):
         #Add a light source
         light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        light.setPosition ( ogre.Vector3(20, 80, 50) )
+        light.setPosition ( ogre.Vector3(20, 80, -50) )
         light.diffuseColour = 1, 1, 1
         light.specularColour = 1, 1, 1
-
-    # here setup the input system (OIS is the one preferred with Ogre3D)
-    def setupInputSystem(self):
-        windowHandle = self.renderWindow.getCustomAttributeInt("WINDOW")
-        paramList = [("WINDOW", str(windowHandle))]
-        self.inputManager = OIS.createPythonInputSystem(paramList)
-        # Now InputManager is initialized for use. Keyboard and Mouse objects
-        # must still be initialized separately
-        try:
-            self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, False)
-            self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, False)
-        except Exception, e:
-            raise e
-
-    #===========================================================================
-    # def createFrameListener(self):
-    #    self.eventListener = EventListener(self.renderWindow, True, True, False) # switch the final "False" into "True" to get joystick support
-    #    self.root.addFrameListener(self.eventListener)
-    #===========================================================================
 
     def GetFrameRate(self):
         return self.framerate#self.renderWindow.getLastFPS()
@@ -150,9 +128,6 @@ class OgreRenderer(BciGenericRenderer):
             pass
 
     def GetEvents(self):
-        #self.keyboard.capture()
-        #But we have to check every key
-        #self.mouse.capture()
         #This is called on every visual display iteration
         #Return an array of events
         #Each item in the array is passed to myBCPyApplication.Event
@@ -160,11 +135,11 @@ class OgreRenderer(BciGenericRenderer):
 
     def DefaultEventHandler(self, event):
         return False
-        #return (event.type == pygame.QUIT) or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
 
     def StartFrame(self, objlist):
         #Called on every visual display iteration
         #objlist is the list of stimuli
+        for obj in objlist: obj.updatePos()
         ogre.WindowEventUtilities().messagePump()
         self.root.renderOneFrame()
         time.sleep(.0001)
@@ -200,181 +175,222 @@ class OgreRenderer(BciGenericRenderer):
 
     def Cleanup(self):
         #del self.eventListener
-        #=======================================================================
-        # self.inputManager.destroyInputObjectKeyboard(self.keyboard)
-        # self.inputManager.destroyInputObjectMouse(self.mouse)
-        # OIS.InputManager.destroyInputSystem(self.inputManager)
-        # self.inputManager = None
-        #=======================================================================
         self.root.shutdown()
 
 BciGenericRenderer.subclass = OgreRenderer
 
-
-class EventListener(ogre.FrameListener, ogre.WindowEventListener, OIS.MouseListener, OIS.KeyListener, OIS.JoyStickListener):
+class OgreStimulus(Coords.Box):
     """
-    This class handles all our ogre and OIS events, mouse/keyboard/joystick
-    depending on how you initialize this class. All events are handled
-    using callbacks (buffered).
+    Base class for visual stimuli.
     """
-    mouse = None
-    keyboard = None
-    joy = None
-
-    def __init__(self, renderWindow, bufferedMouse, bufferedKeys, bufferedJoy):
-
-        # Initialize the various listener classes we are a subclass from
-        ogre.FrameListener.__init__(self)
-        ogre.WindowEventListener.__init__(self)
-        OIS.MouseListener.__init__(self)
-        OIS.KeyListener.__init__(self)
-        OIS.JoyStickListener.__init__(self)
-
-        self.renderWindow = renderWindow
-
-        # Create the inputManager using the supplied renderWindow
-        windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
-        self.inputManager = OIS.createPythonInputSystem([("WINDOW",str(windowHnd))])
-
-        # Attempt to get the mouse/keyboard input objects,
-        # and use this same class for handling the callback functions.
-        # These functions are defined later on.
-
-        try:
-            if bufferedMouse:
-                self.mouse = self.inputManager.createInputObjectMouse(OIS.OISMouse, bufferedMouse)
-                self.mouse.setEventCallback(self)
-
-            if bufferedKeys:
-                self.keyboard = self.inputManager.createInputObjectKeyboard(OIS.OISKeyboard, bufferedKeys)
-                self.keyboard.setEventCallback(self)
-
-            if bufferedJoy:
-                self.joy = self.inputManager.createInputObjectJoyStick(OIS.OISJoyStick, bufferedJoy)
-                self.joy.setEventCallback(self)
-
-        except Exception, e: # Unable to obtain mouse/keyboard/joy input
-            raise e
-
-        # Set this to True when we get an event to exit the application
-        self.quitApplication = False
-
-        # Listen for any events directed to the window manager's close button
-        ogre.WindowEventUtilities.addWindowEventListener(self.renderWindow, self)
-    def __del__ (self ):
-        # Clean up OIS
-        self.delInputObjects()
-        OIS.InputManager.destroyInputSystem(self.inputManager)
-        self.inputManager = None
-        ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
-
-    def delInputObjects(self):
-        # Clean up the initialized input objects
-        if self.keyboard:
-            self.inputManager.destroyInputObjectKeyboard(self.keyboard)
-        if self.mouse:
-            self.inputManager.destroyInputObjectMouse(self.mouse)
-        if self.joy:
-            self.inputManager.destroyInputObjectJoyStick(self.joy)
-
-    def frameStarted(self, evt):
-        """
-        Called before a frame is displayed, handles events
-        (also those via callback functions, as you need to call capture()
-        on the input objects)
-
-        Returning False here exits the application (render loop stops)
-        """
-        # Capture any buffered events and call any required callback functions
-        if self.keyboard:
-            self.keyboard.capture()
-        if self.mouse:
-            self.mouse.capture()
-        if self.joy:
-            self.joy.capture()
-            # joystick test
-            axes_int = self.joy.getJoyStickState().mAxes
-            axes = []
-            for i in axes_int:
-                axes.append(i.abs)
-            print axes
-
-        # Neatly close our FrameListener if our renderWindow has been shut down
-        if(self.renderWindow.isClosed()):
-            return False
-
-        return not self.quitApplication
-
-### Window Event Listener callbacks ###
-    def windowResized(self, renderWindow):
-        pass
-    def windowClosed(self, renderWindow):
-        # Only close for window that created OIS
-        if(renderWindow == self.renderWindow):
-            del self
-
-# Mouse Listener callbacks ###
-    def mouseMoved(self, frameEvent):
-        return True
-    def mousePressed(self, frameEvent, xid):
-        return True
-    def mouseReleased(self, frameEvent, xid):
-        return True
-
-### Key Listener callbacks ###
-    def keyPressed(self, evt):
-        # Quit the application if we hit the escape button
-        if evt.key == OIS.KC_ESCAPE:
-            return True
-            #self.quitApplication = True
-        if evt.key == OIS.KC_1:
-            print "hello"
-            return True
-    def keyReleased(self, evt):
-        return True
-
-### Joystick Listener callbacks ###
-    def buttonPressed(self, frameEvent, xid):
-        return True
-    def buttonReleased(self, frameEvent, xid):
-        return True
-    def axisMoved(self, frameEvent, xid):
-        return True
-
-class MeshObject(object):
-    """Ogre object"""
-    def __init__(self, screen=None, mesh_name='hand.mesh', node=None, position=(0,0,0)):
-        """Create a MeshObject. screen is the renderer, node is a parent node, position is where, relative to parent, to place."""
-        sm = screen.sceneManager
-        self.entity = sm.createEntity(mesh_name + 'Entity', mesh_name)
-        node = node if node else sm.getRootSceneNode()
-        self.node = node.createChildSceneNode(mesh_name + 'Node', position)
-        self.node.attachObject(self.entity)
-        #=======================================================================
-        # src = self.node.Orientation * (ogre.Vector3().UNIT_Z)
-        # directionToGo = ogre.Vector3(0,0,-1)
-        # quat = src.getRotationTo(directionToGo)
-        # self.node.Orientation=quat
-        #=======================================================================
-
-class ImageStimulus(Coords.Box):
-    #From shapes
-    #ImageStimulus(texture=canvas, size=size, anchor=anchor, position=position, color=color[:3], **kwargs)
-    #Where canvas is Image.new("RGBA", csize, (0,0,0,0)) from PIL
-    #We need to take the properties of the texture to create an object,
-    #then apply the texture
-    def __init__(self, content=None, size=None, position=None, anchor='center',
-        angle=0.0, color=(1,1,1,1), on=True, texture=None, use_alpha=True, smooth=True, sticky=False, flipx=False, flipy=False):
+    def __init__(self, ogr=None, size=None, position=None, anchor='center', on=True, sticky=False):
         Coords.Box.__init__(self)
+        print ogr
+        if ogr:
+            self.ogr = ogr
+        else:
+            self.ogr = ogre.Root.getSingleton() #TODO, try to get the OgreRenderer another way
+
+        self._props = {}
+        self._last_transformation = None
+        if position == None: position = (0,0,0)
+        self.anchor = anchor
+        self.sticky = False
+        self.position = position
+        if size: self.size = size
+        self.sticky = sticky
+
+    def updatePos(self):
+        #=======================================================================
+        # From Coords.Box we inherit:
+        # self.rect, .lims, .position, .x, .y, .z,
+        # .size, .width, .height, .depth, .anchor, .anchorstr,
+        # .left, .right, .top, .bottom, .near, .far, .internal
+        # These getters and setters operate on internal properties:
+        # self.__size, .__position, .__anchor
+        # .__anchorstr, .__sticky, .__internal
+        # Typically, a BCPy2000 application will operate on its stimuli as follows:
+        # my_stim = app.stimuli['my_stim']
+        # my_stim.x = 100
+        # This does nothing except update the internal variables.
+        # For this to be meaningful, we have to use the information in the internal
+        # variables to position the object in Ogre.
+        #=======================================================================
+        pass #This should be defined by the subclasses
+
+class MeshStimulus(OgreStimulus):
+    """An OgreStimulus using a provided mesh."""
+    def __init__(self, entity=None, mesh_name='hand.mesh', node=None, on=True, **kwargs):
+        OgreStimulus.__init__(self, on=on, **kwargs)
+        sm = self.ogr.getSceneManager("Default SceneManager")
+        if entity is None:
+            entity = sm.createEntity(mesh_name + 'Entity', mesh_name)
+        self.entity = entity
+        node = node if node else sm.getRootSceneNode()
+        self.node = node.createChildSceneNode(mesh_name + 'Node', (0,0,0))
+        self.node.attachObject(self.entity)
+        self.refreshBox()
+        self.on = on
+
+    def updatePos(self):
+        #TODO: use top-left as 0,0
+        self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
+        if self._last_transformation != self.position:
+            self.refreshBox()
+            self._last_transformation = self.position
+
+    def refreshBox(self):
+        wbox = self.entity.getWorldBoundingBox()
+        temp = wbox.getSize()
+        self.size = (temp[0], temp[1], temp[2])
+
+    @property
+    def on(self):
+        """Hidden or not"""
+        return self.entity.isVisible()
+    @on.setter
+    def on(self, value):
+        self.entity.setVisible(value)
+
+class ImageStimulus(MeshStimulus):
+    """Class for creating 2D-like stimuli.
+    Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
+    This class is meant to be laterally-compatible with VisionEggRenderer's ImageStimulus class.
+    """
+    #http://www.ogre3d.org/tikiwiki/tiki-index.php?page=MadMarx+Tutorial+4&structure=Tutorials
+    def __init__(self, content=None, texture=None, color=(1,1,1,1), **kwargs):
+        #Create a manual object from content or texture (which are more appropriate for pygame or visionegg)
+        #content might be ???
+        #texture might be a PIL Image.new("RGBA", csize, (0, 0, 0, 0) )
+        #color might have length 3 or 4
+        mo = ogre.ManualObject("CubeWithAxes")
+        #mo.setDynamic(False)
+        cp = 100
+        cm = -cp
+        mo.begin("BaseWhiteNoLighting", ogre.RenderOperation.OT_TRIANGLE_LIST)
+        mo.position(cm, cp, cm)
+        mo.colour(ogre.ColourValue(0.0,1.0,0.0,1.0))
+        mo.position(cp, cp, cm)
+        mo.colour(ogre.ColourValue(1.0,1.0,0.0,1.0));
+        mo.position(cp, cm, cm)
+        mo.colour(ogre.ColourValue(1.0,0.0,0.0,1.0));
+        mo.position(cm, cm, cm)
+        mo.colour(ogre.ColourValue(0.0,0.0,0.0,1.0));
+        mo.position(cm, cp, cp)
+        mo.colour(ogre.ColourValue(0.0,1.0,1.0,1.0));
+        mo.position(cp, cp, cp)
+        mo.colour(ogre.ColourValue(1.0,1.0,1.0,1.0));
+        mo.position(cp, cm, cp)
+        mo.colour(ogre.ColourValue(1.0,0.0,1.0,1.0));
+        mo.position(cm, cm, cp)
+        mo.colour(ogre.ColourValue(0.0,0.0,1.0,1.0));
+        mo.triangle(0,1,2)
+        mo.triangle(2,3,0)
+        mo.triangle(4,6,5)
+        mo.triangle(6,4,7)
+        mo.triangle(0,4,5)
+        mo.triangle(5,1,0)
+        mo.triangle(2,6,7)
+        mo.triangle(7,3,2)
+        mo.triangle(0,7,4)
+        mo.triangle(7,0,3)
+        mo.triangle(1,5,6)
+        mo.triangle(6,2,1)
+        mo.end()
+
+        mo.begin("BaseWhiteNoLighting",ogre.RenderOperation.OT_LINE_LIST)
+        lAxeSize = 2.0 * cp
+        mo.position(0.0, 0.0, 0.0)
+        mo.colour(ogre.ColourValue(1,0,0,1))
+        mo.position(lAxeSize, 0.0, 0.0)
+        mo.colour(ogre.ColourValue(1,0,0,1))
+        mo.position(0.0, 0.0, 0.0)
+        mo.colour(ogre.ColourValue(0,1,0,1))
+        mo.position(0.0, lAxeSize, 0.0)
+        mo.colour(ogre.ColourValue(0,1,0,1))
+        mo.position(0.0, 0.0, 0.0)
+        mo.colour(ogre.ColourValue(0,0,1,1))
+        mo.position(0.0, 0.0, lAxeSize)
+        mo.colour(ogre.ColourValue(0,0,1,1))
+        mo.index(0)
+        mo.index(1)
+        mo.index(2)
+        mo.index(3)
+        mo.index(4)
+        mo.index(5)
+        mo.end()
+
+        lResourceGroup = ogre.ResourceGroupManager.DEFAULT_RESOURCE_GROUP_NAME
+        mo.convertToMesh("MeshCubeAndAxe", lResourceGroup)
+        MeshStimulus.__init__(self, mesh_name="MeshCubeAndAxe", **kwargs)
+
+#===============================================================================
+#        #mo.setRenderQueueGroup(ogre.RenderQueueGroupID.RENDER_QUEUE_OVERLAY)
+#        #mo.setUseIdentityProjection(True)
+#        #mo.setUseIdentityView(True)
+#        #mo.setQueryFlags(0)
+#        #mo.clear()
+#        #mo.begin("", ogre.RenderOperation.OT_LINE_STRIP) #mat, rendop
+#        mo.begin("BaseWhiteNoLighting", ogre.RenderOperation.OT_TRIANGLE_LIST) #mat, rendop Examples/GrassBlades
+#
+#        for ix in range(len(content)):
+#            mo.position(content[ix].x,content[ix].y,content[ix].z)
+#            mo.normal(0,0,1)
+#            mo.textureCoord(content[ix][0],content[ix][1])
+#            mo.colour(color[0],color[1],color[2],color[3])
+#        mo.triangle(3,2,1)
+#        mo.triangle(1,0,3)
+#        #mo.quad(3,2,1,0)
+#        mo.end()
+#        mo.convertToMesh("moMesh")
+#        MeshStimulus.__init__(self, mesh_name="moMesh", **kwargs)
+#===============================================================================
+
+    def updatePos(self):
+        self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
 
 class Disc(ImageStimulus):
     def __init__(self, position=(10,10), radius=10, size=None, color=(0,0,1), **kwargs):
-        ImageStimulus.__init__(self, content=None, size=size, position=position, color=color, **kwargs)
+        ogr = ogre.Root.getSingleton()
+        sm = ogr.getSceneManager("Default SceneManager")
+        entity = sm.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
+        MeshStimulus.__init__(self, entity=entity)
 
 class Block(ImageStimulus):
+    """
+    Class to create a 2D rectangle.
+    http://wiki.python-ogre.org/index.php/Intermediate_Tutorial_4
+    """
     #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
-    def __init__(self, position=(10, 10), size=(10, 10), color=(0, 0, 1), **kwargs):
-        ImageStimulus.__init__(self, content=None, **kwargs)
+    def __init__(self, position=(0,0), size=(10, 10), **kwargs):
+        #=======================================================================
+        # ogr = ogre.Root.getSingleton()
+        # renderWindow = ogr.getAutoCreatedWindow()
+        # vp = renderWindow.getViewport(0)
+        # scrw,scrh = float(vp.getActualWidth()), float(vp.getActualHeight()) #800, 600
+        # #sqx = scrw/scrh
+        # new_size = (size[0]/scrw, size[1]/scrh)
+        # myrect = ogre.Rectangle2D(True)
+        # myrect.setCorners(-new_size[0]/2.0,
+        #                  new_size[1]/2.0,
+        #                  new_size[0]/2.0,
+        #                  -new_size[1]/2.0)#l,t,r,b
+        # myrect.setMaterial("Template/Black50")
+        # myrect.setRenderQueueGroup(ogre.RenderQueueGroupID.RENDER_QUEUE_OVERLAY)
+        # MeshStimulus.__init__(self, entity=myrect, **kwargs)
+        #=======================================================================
+        content = [
+                    Coords.Point((position[0]-size[0]/2.0, position[1]-size[1]/2.0)),
+                    Coords.Point((position[0]-size[0]/2.0, position[1]+size[1]/2.0)),
+                    Coords.Point((position[0]+size[0]/2.0, position[1]+size[1]/2.0)),
+                    Coords.Point((position[0]+size[0]/2.0, position[1]-size[1]/2.0))
+                ]
+        ImageStimulus.__init__(self, content=content, size=size, position=position, **kwargs)
+
+
+class Movie(ImageStimulus):
+    def __init__(self, filename, position=(100,100), size=None, **kwargs):
+        pass
 
 class Text(object):
     """Docstring"""
@@ -417,6 +433,11 @@ class Text(object):
         self.size = (len(text)*font_size/(16.0/6),font_size)
         self.position = position
         self.on = on
+
+    def updatePos(self):
+        pass
+        #Placeholder until this subclasses OgreStimulus
+        #Then this will handle the transformation from internal position to onscreen (Ogre) position.
 
     #Positional values for the panel
     @property

@@ -37,26 +37,38 @@ class BciApplication(BciGenericApplication):
     #############################################################
 
     def Initialize(self, indim, outdim):
+        self.color = numpy.array([1.0, 0.0, 0.0])
         # Set up stimuli. Visual stimuli use calls to
         # self.stimulus(). Attach whatever you like as attributes
         # of self, for easy access later on. Don't overwrite existing
         # attributes, however:  using names that start with a capital
         # letter is a good insurance against this.
 
-        Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
-                                         # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
-        Mesh = OgreRenderer.MeshObject
         #w,h = self.screen.size
         #self.screen.SetDefaultFont('comic sans ms', 30)
+
+        Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
+                                         # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
         self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
                                         position=(300, 100),
                                         anchor='right'         )
-        self.stimulus('hand', Mesh, screen=self.screen, mesh_name='hand.mesh')
-        self.stimuli['hand'].node.setScale(50,50,50)
-        self.color = numpy.array([1.0, 0.0, 0.0])
+        addstatemonitor(self, 'Running', showtime=True)
+
+        #=======================================================================
+        # Mesh = OgreRenderer.MeshStimulus
+        # self.stimulus('hand', Mesh, ogr=self.screen, mesh_name='hand.mesh')
+        # self.stimuli['hand'].node.setScale(50,50,50)
+        #=======================================================================
+
+        Disc = self.VisualStimuli.Disc
+        self.stimulus('cursor1',  z=3,   stim=Disc(position=(0,0), radius=10, color=(1,1,1), on=True))
+
+        #=======================================================================
+        # Block = self.VisualStimuli.Block
+        # self.stimulus('block',z=2, stim= Block(position = (0,0), size = (400,400), color=(1, 0.1, 0.1, 0.5), on=True))
+        #=======================================================================
         #b = box(size=siz, position=(scrw/2.0,scrh/2.0 - siz[1]/6.0), sticky=True)
         #triangle = PolygonTexture(frame=b, vertices=((0,1),(1,1),(0.5,0)), color=(0,0,0,0.5))
-        addstatemonitor(self, 'Running', showtime=True)
 
     #############################################################
 
@@ -94,7 +106,7 @@ class BciApplication(BciGenericApplication):
         # update stimulus parameters if they need to be animated on a frame-by-frame basis
         intensity = 0.5 + 0.5 * numpy.sin(2.0 * numpy.pi * 0.5 * self.since('run')['msec']/1000.0)
         self.screen.bgcolor = intensity * self.color
-        self.stimuli['hand'].node.yaw(0.02)
+        #self.stimuli['hand'].node.yaw(0.02)
 
     #############################################################
 

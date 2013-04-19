@@ -4,30 +4,42 @@ BCPyPandaRenderer
 This is a drop-in replacement renderer for [BCPy2000](http://bci2000.org/downloads/BCPy2000/Renderers.html)
 using the [OGRE3D](http://www.ogre3d.org/) engine with its [Python-Ogre](http://www.python-ogre.org/) bindings.
 
-This is still very early but the test works. Run `test.bat` to try it out.
-
 ## Installation
 
 My [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) implementation of BCPy2000 requires Python 2.6.
 Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.6.4%20SnapShot/Python-Ogre-Core-1.6.4-r1017-py263.7z/download) compatible with Python 2.6.
 [Install instructions](http://www.cse.unr.edu/~sushil/class/381/ware/pythonOgreWin7Install.pdf).
 
-You will have to edit your plugins.cfg and resources.cfg file so they point to where your resources are stored.
+Download this repo and put it somewhere convenient. Edit your plugins.cfg and resources.cfg file
+so they point to where your resources are stored. Edit test.bat to point to your BCI2000 files.
 
-## Virtual Hand
+Run `test.bat` to try it out.
 
-One reason for using a 3D engine is that I would like to use BCPy2000 to
-control the animation of a virtual hand.
+## Notes
 
+To maintain compatibility with other applications I've used the myApp.stimulus() convention. This wraps
+the stimulus objects in a BciStimulus object. e.g.:
+
+`hand = myApp.stimuli['hand']`  `hand` is a BciStimulus object.
+
+The BciStimulus object conveniently exposes the actual object's properties. e.g.:
+`hand.x = 10` is equivalent to `hand.obj.x = 10`
+
+This is not true for `z`. i.e., `hand.z = 10` is not equivalent to `hand.obj.z = 10`. For a BciStimulus object,
+.z has a different meaning. Therefore I recommend to avoid confusion by always operating on the stimulus.obj position.
+
+### Virtual Hand
+
+One reason for using a 3D engine is that I would like to use BCPy2000 to control the animation of a virtual hand.
 I am using [libhand](www.libhand.org). It comes with an OGRE model but that is not compatible with PythonOgre 1.6.4.
 Therefore I used the Blender model, then [exported](https://code.google.com/p/blender2ogre/)
 to a generic OGRE .xml, then converted it to the correct version using the tools found in the PythonOgre 1.6.4 snapshot release.
 
-## Renderer Life-Cycle
+### Renderer Life-Cycle
 
 Here I will keep some notes to help me keep track of how things get initialized.
 
-### BCI2000 stage
+#### BCI2000 stage
 BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unreadable to me, but I found a few things in PythonFilter.cpp that might help me understand what's going on.
 
 1. `Py_Initialize()`
@@ -45,10 +57,10 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
     2. _Process
     3. _StopRun
 
-### Import stage. From (3) in the BCI2000 stage.
+#### Import stage. From (3) in the BCI2000 stage.
 1. GenericApplication sets a global class VisualStimuli, imported from ... ?
 
-### Instancing stage. From (4) in the BCI2000 stage?
+#### Instancing stage. From (4) in the BCI2000 stage?
 1. TestApplication is imported
 2. TestApplication does not define `__init__`, so `GenericApplication.__init__()` is called.
     1. `Core.BciCore.__init__()` #Call's super's init
@@ -58,10 +70,10 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
     3. self._threads['visual display'] = BciThread(func=self._visual_display, loop=True)` #Messging capable thread is created but not run yet
     4. `self._optimize_display_thread_affinity = False`, `self._optimize_display_thread_priority = False`, `self._optimize_process_priority = False`, `self._display_sleep_msec = -1`
 
-### _start stage. From (5) in the BCI2000 stage.
+#### _start stage. From (5) in the BCI2000 stage.
 1. Threads [visual display, console, phase machine] are .start()ed
 
-### Construct phase. From (6) in the BCI2000 stage.
+#### Construct phase. From (6) in the BCI2000 stage.
 1. GenericApplication._Construct(bci)
     1. `if self._optimize_display_thread_affinity: PrecisionTiming.SetThreadAffinity([0])`
     2. `paramdefs,statedefs = super(BciGenericApplication, self)._Construct()`    # Core's Construct. params and states.
@@ -70,7 +82,7 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
         1. `OgreRenderer.__init__()` sets some constants. Not much else.
     5. Do something with the VisualStimuli global class
 
-### Preflight and Initialize phase. From (8) in the BCI2000 stage.
+#### Preflight and Initialize phase. From (8) in the BCI2000 stage.
 1. Calls BciGenericApplication._Preflight
     1. super's _Preflight doesn't do anything relevant to us.
     2. subclass (our app)'s Preflight
@@ -104,9 +116,9 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
         11. `self._lock.release('Frame')`
         12. `self.screen.Cleanup()`
 
-## Stimulus Life-Cycle
+### Stimulus Life-Cycle
 
-### Initialize
+#### Initialize
 1. `myApp.stimulus(name, stimClass, z=0, **kwargs)`
     1. Makes sure myApp has .stimuli, ._stimlist, ._stimz, ._stimq
     2. `s = BciStimulus(myApp, name, z)`
@@ -121,7 +133,7 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
         1. Appends the stimulus to myApp._stimq and sets it in myApp.stimuli dict
     5. return s
 
-### Rendering
+#### Rendering
 In the case of VisionEggRenderer
 
 1. myApp._update_stimlist()
