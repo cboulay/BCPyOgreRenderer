@@ -54,14 +54,14 @@ class BciApplication(BciGenericApplication):
                                         anchor='right'         )
         addstatemonitor(self, 'Running', showtime=True)
 
-        #=======================================================================
-        # Mesh = OgreRenderer.MeshStimulus
-        # self.stimulus('hand', Mesh, ogr=self.screen, mesh_name='hand.mesh')
-        # self.stimuli['hand'].node.setScale(50,50,50)
-        #=======================================================================
+        Mesh = OgreRenderer.MeshStimulus
+        self.stimulus('hand', Mesh, mesh_name='hand.mesh')
+        self.stimuli['hand'].node.setScale(50,50,50)
 
-        Disc = self.VisualStimuli.Disc
-        self.stimulus('cursor1',  z=3,   stim=Disc(position=(0,0), radius=10, color=(1,1,1), on=True))
+        #=======================================================================
+        # Disc = self.VisualStimuli.Disc
+        # self.stimulus('cursor1',  z=3,   stim=Disc(position=(0,0), radius=10, color=(1,1,1), on=True))
+        #=======================================================================
 
         #=======================================================================
         # Block = self.VisualStimuli.Block

@@ -349,12 +349,12 @@ class ImageStimulus(MeshStimulus):
     def updatePos(self):
         self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
 
-class Disc(ImageStimulus):
+class Disc(MeshStimulus):
     def __init__(self, position=(10,10), radius=10, size=None, color=(0,0,1), **kwargs):
         ogr = ogre.Root.getSingleton()
         sm = ogr.getSceneManager("Default SceneManager")
         entity = sm.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
-        MeshStimulus.__init__(self, entity=entity)
+        MeshStimulus.__init__(self, entity=entity, **kwargs)
 
 class Block(ImageStimulus):
     """
