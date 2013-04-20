@@ -97,7 +97,7 @@ class OgreRenderer(BciGenericRenderer):
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
         self.sceneManager.setAmbientLight(ogre.ColourValue(0.7, 0.7, 0.7))
         #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
-        self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
+        #self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
 
         #Create and configure the camera
         self.camera = self.sceneManager.createCamera("Camera")
@@ -139,7 +139,7 @@ class OgreRenderer(BciGenericRenderer):
     def StartFrame(self, objlist):
         #Called on every visual display iteration
         #objlist is the list of stimuli
-        for obj in objlist: obj.updatePos()
+        #for obj in objlist: obj.updatePos()
         ogre.WindowEventUtilities().messagePump()
         self.root.renderOneFrame()
         time.sleep(.0001)
@@ -181,69 +181,90 @@ BciGenericRenderer.subclass = OgreRenderer
 
 class OgreStimulus(Coords.Box):
     """
-    Base class for visual stimuli.
+    Abstract base class for OGRE3D stimuli.
     """
-    def __init__(self, ogr=None, size=None, position=None, anchor='center', on=True, sticky=False):
+    def __init__(self, size=None, color=(1,1,1,1), position=(0,0,0), anchor='center', on=True, sticky=False,
+                 ogr=None, sceneManager=None):
         Coords.Box.__init__(self)
-        print ogr
-        if ogr:
-            self.ogr = ogr
-        else:
-            self.ogr = ogre.Root.getSingleton() #TODO, try to get the OgreRenderer another way
+        self.ogr = ogr if ogr else ogre.Root.getSingleton()
+        self.sceneManager = sceneManager if sceneManager else ogr.getSceneManager("Default SceneManager")
 
         self._props = {}
-        self._last_transformation = None
-        if position == None: position = (0,0,0)
         self.anchor = anchor
         self.sticky = False
         self.position = position
         if size: self.size = size
         self.sticky = sticky
-
-    def updatePos(self):
-        #=======================================================================
-        # From Coords.Box we inherit:
-        # self.rect, .lims, .position, .x, .y, .z,
-        # .size, .width, .height, .depth, .anchor, .anchorstr,
-        # .left, .right, .top, .bottom, .near, .far, .internal
-        # These getters and setters operate on internal properties:
-        # self.__size, .__position, .__anchor
-        # .__anchorstr, .__sticky, .__internal
-        # Typically, a BCPy2000 application will operate on its stimuli as follows:
-        # my_stim = app.stimuli['my_stim']
-        # my_stim.x = 100
-        # This does nothing except update the internal variables.
-        # For this to be meaningful, we have to use the information in the internal
-        # variables to position the object in Ogre.
-        #=======================================================================
-        pass #This should be defined by the subclasses
-
-class MeshStimulus(OgreStimulus):
-    """An OgreStimulus using a provided mesh."""
-    def __init__(self, entity=None, mesh_name='hand.mesh', node=None, on=True, **kwargs):
-        OgreStimulus.__init__(self, on=on, **kwargs)
-        sm = self.ogr.getSceneManager("Default SceneManager")
-        if entity is None:
-            entity = sm.createEntity(mesh_name + 'Entity', mesh_name)
-        self.entity = entity
-        node = node if node else sm.getRootSceneNode()
-        self.node = node.createChildSceneNode(mesh_name + 'Node', (0,0,0))
-        self.node.attachObject(self.entity)
-        self.refreshBox()
         self.on = on
 
-    def updatePos(self):
-        #TODO: use top-left as 0,0
-        self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
-        if self._last_transformation != self.position:
-            self.refreshBox()
-            self._last_transformation = self.position
+class EntityStimulus(OgreStimulus):
+    """Creates an OgreStimulus using provided mesh or entity.
+    Here we overshadow the property setters and getters
+    so that they point to the node and/or entity properties
+    while still interfacing with the hidden variables for
+    interfacing various coordinate frames."""
+    def __init__(self, mesh_name='hand.mesh', ogr=None, sceneManager=None, entity=None, parent=None, **kwargs):
+        ogr = ogr if ogr else ogre.Root.getSingleton()
+        sceneManager = sceneManager if sceneManager else ogr.getSceneManager("Default SceneManager")
+        self.entity = entity if entity else sceneManager.createEntity(mesh_name + 'Entity', mesh_name)
+        parent = parent if parent else sceneManager.getRootSceneNode()
+        self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
+        self.node.attachObject(self.entity)
+        OgreStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, **kwargs)
 
-    def refreshBox(self):
-        wbox = self.entity.getWorldBoundingBox()
-        temp = wbox.getSize()
-        self.size = (temp[0], temp[1], temp[2])
+    #=======================================================================
+    # From Coords.Box we inherit:
+    # self.rect, .lims, .position, .x, .y, .z,
+    # .size, .width, .height, .depth, .anchor, .anchorstr,
+    # .left, .right, .top, .bottom, .near, .far, .internal
+    # These getters and setters operate on internal properties:
+    # self.__size, .__position, .__anchor
+    # .__anchorstr, .__sticky, .__internal
+    # Typically, a BCPy2000 application will operate on its stimuli as follows:
+    # my_stim = app.stimuli['my_stim']
+    # my_stim.x = 100
+    # This does nothing except update the internal variables.
+    # For this to be meaningful, we have to use the information in the internal
+    # variables to position the object in Ogre.
+    #=======================================================================
 
+    @property
+    def position(self):
+        temp = self.node.getPosition()
+        super(OgreStimulus, self.__class__).position.fset(self, Coords.Point([temp[0], temp[1], temp[2]]))
+        return super(OgreStimulus, self).position
+    @position.setter
+    def position(self, value):
+        value = Coords.Point(value)
+        self.node.setPosition(value.x, value.y, value.z)
+        super(OgreStimulus, self.__class__).position.fset(self, value)
+    @property
+    def x(self):
+        self.position #This updates __position with the true position.
+        return super(OgreStimulus, self).x
+    @x.setter
+    def x(self, value):
+        oldpos = self.position
+        self.position = (value, oldpos[1], oldpos[2])
+        super(OgreStimulus, self.__class__).x.fset(self, value)
+    @property
+    def y(self):
+        self.position #This updates __position with the true position.
+        return super(OgreStimulus, self).y
+    @y.setter
+    def y(self, value):
+        oldpos = self.position
+        self.position = (oldpos[0], value, oldpos[2])
+        super(OgreStimulus, self.__class__).y.fset(self, value)
+    @property
+    def z(self):
+        self.position #This updates __position with the true position.
+        return super(OgreStimulus, self).z
+    @z.setter
+    def z(self, value):
+        oldpos = self.position
+        self.position = (oldpos[0], oldpos[1], value)
+        super(OgreStimulus, self.__class__).z.fset(self, value)
     @property
     def on(self):
         """Hidden or not"""
@@ -252,7 +273,7 @@ class MeshStimulus(OgreStimulus):
     def on(self, value):
         self.entity.setVisible(value)
 
-class ImageStimulus(MeshStimulus):
+class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
     Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
     This class is meant to be laterally-compatible with VisionEggRenderer's ImageStimulus class.
@@ -322,7 +343,7 @@ class ImageStimulus(MeshStimulus):
 
         lResourceGroup = ogre.ResourceGroupManager.DEFAULT_RESOURCE_GROUP_NAME
         mo.convertToMesh("MeshCubeAndAxe", lResourceGroup)
-        MeshStimulus.__init__(self, mesh_name="MeshCubeAndAxe", **kwargs)
+        EntityStimulus.__init__(self, mesh_name="MeshCubeAndAxe", **kwargs)
 
 #===============================================================================
 #        #mo.setRenderQueueGroup(ogre.RenderQueueGroupID.RENDER_QUEUE_OVERLAY)
@@ -349,12 +370,13 @@ class ImageStimulus(MeshStimulus):
     def updatePos(self):
         self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
 
-class Disc(MeshStimulus):
-    def __init__(self, position=(10,10), radius=10, size=None, color=(0,0,1), **kwargs):
+class Disc(EntityStimulus):
+    def __init__(self, radius=10, **kwargs):
         ogr = ogre.Root.getSingleton()
-        sm = ogr.getSceneManager("Default SceneManager")
-        entity = sm.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
-        MeshStimulus.__init__(self, entity=entity, **kwargs)
+        sceneManager = ogr.getSceneManager("Default SceneManager")
+        entity = sceneManager.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
+        #TODO: Use radius?
+        EntityStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, entity=entity, **kwargs)
 
 class Block(ImageStimulus):
     """

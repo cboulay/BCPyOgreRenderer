@@ -54,8 +54,8 @@ class BciApplication(BciGenericApplication):
                                         anchor='right'         )
         addstatemonitor(self, 'Running', showtime=True)
 
-        Mesh = OgreRenderer.MeshStimulus
-        self.stimulus('hand', Mesh, mesh_name='hand.mesh')
+        EntityStimulus = OgreRenderer.EntityStimulus
+        self.stimulus('hand', EntityStimulus, mesh_name='hand.mesh')
         self.stimuli['hand'].node.setScale(50,50,50)
 
         #=======================================================================
