@@ -32,7 +32,7 @@ class BciApplication(BciGenericApplication):
     def Preflight(self, sigprops):
         # Here is where you would set VisionEgg.config parameters,
         # either using self.screen.setup(), or directly.
-        self.screen.setup(frameless_window=0)  # if using VisionEggRenderer, this sets, VISIONEGG_FRAMELESS_WINDOW
+        self.screen.setup(frameless_window=0, coordinate_mapping = 'pixels from lower left')  # if using VisionEggRenderer, this sets, VISIONEGG_FRAMELESS_WINDOW
 
     #############################################################
 
@@ -47,26 +47,29 @@ class BciApplication(BciGenericApplication):
         #w,h = self.screen.size
         #self.screen.SetDefaultFont('comic sans ms', 30)
 
-        Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
-                                         # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
-        self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
-                                        position=(300, 100),
-                                        anchor='right'         )
-        addstatemonitor(self, 'Running', showtime=True)
+        #=======================================================================
+        # Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
+        #                                 # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
+        # self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
+        #                                position=(300, 100),
+        #                                anchor='right'         )
+        # addstatemonitor(self, 'Running', showtime=True)
+        #=======================================================================
 
-        EntityStimulus = OgreRenderer.EntityStimulus
-        self.stimulus('hand', EntityStimulus, mesh_name='hand.mesh')
-        self.stimuli['hand'].node.setScale(50,50,50)
+        #=======================================================================
+        # EntityStimulus = OgreRenderer.EntityStimulus
+        # self.stimulus('hand', EntityStimulus, mesh_name='hand.mesh', position=(400,300))
+        # self.stimuli['hand'].scale(50.0)
+        #=======================================================================
 
         #=======================================================================
         # Disc = self.VisualStimuli.Disc
-        # self.stimulus('cursor1',  z=3,   stim=Disc(position=(0,0), radius=10, color=(1,1,1), on=True))
+        # self.stimulus('cursor1',  z=3,   stim=Disc(position=(400,300), radius=20, color=(1,1,1), on=True))
         #=======================================================================
 
-        #=======================================================================
-        # Block = self.VisualStimuli.Block
-        # self.stimulus('block',z=2, stim= Block(position = (0,0), size = (400,400), color=(1, 0.1, 0.1, 0.5), on=True))
-        #=======================================================================
+        Block = self.VisualStimuli.Block
+        self.stimulus('block',z=2, stim= Block(position = (400,300), size = (100,50), color=(1, 0.1, 0.1, 0.5), on=True))
+
         #b = box(size=siz, position=(scrw/2.0,scrh/2.0 - siz[1]/6.0), sticky=True)
         #triangle = PolygonTexture(frame=b, vertices=((0,1),(1,1),(0.5,0)), color=(0,0,0,0.5))
 

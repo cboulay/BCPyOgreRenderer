@@ -1,7 +1,5 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
-#TODO: ImageStimulus
-#TODO: Block
-#TODO: Disc
+#TODO: PolygonTexture
 #TODO: Keyboard events passed to application
 #TODO: Framerate
 #TODO: Fonts
@@ -36,11 +34,13 @@ class OgreRenderer(BciGenericRenderer):
         bgcolor = None, framerate = None, changemode = None,
         frameless_window = None, always_on_top = None, title=None,
         plugins_path = 'plugins.cfg.nt', resource_path = 'resources.cfg',
+        coordinate_mapping = 'pixels from center',
         **kwds):
         #Set any constants that may come from the parameters.
         #Called during application preflight on the main thread
         self.plugins_path = plugins_path
         self.resource_path = resource_path
+        self.__coordinate_mapping = coordinate_mapping
 
     def Initialize(self, bci=None):
         #Called after generic preflights, after generic _Initialize, but before application Initialize
@@ -101,20 +101,26 @@ class OgreRenderer(BciGenericRenderer):
 
         #Create and configure the camera
         self.camera = self.sceneManager.createCamera("Camera")
-        self.camera.setPosition( ogre.Vector3(0, 0, -400) )
-        self.camera.lookAt( ogre.Vector3(0, 0, 0) )
-        self.camera.setNearClipDistance(15)
 
         #Create and configure the viewPort
         self.viewPort = self.root.getAutoCreatedWindow().addViewport(self.camera)
         self.viewPort.setBackgroundColour(self._bgcolor)
 
+        #Place the camera as far from the 0 plane as the larger of the screen size
+        scrw,scrh = self.size
+        longd = max(scrw,scrh)
+        self.camera.setPosition( ogre.Vector3(0, 0, -longd) )
+        self.camera.lookAt( ogre.Vector3(0, 0, 0) )
+        self.camera.setNearClipDistance(round(longd/10))
+
         #Add a light source
-        light = self.sceneManager.createLight("Light1")
+        self.light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        light.setPosition ( ogre.Vector3(20, 80, -50) )
-        light.diffuseColour = 1, 1, 1
-        light.specularColour = 1, 1, 1
+        self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
+        self.light.diffuseColour = 1, 1, 1
+        self.light.specularColour = 1, 1, 1
+
+        self.coordinate_mapping = self.__coordinate_mapping
 
     def GetFrameRate(self):
         return self.framerate#self.renderWindow.getLastFPS()
@@ -156,12 +162,11 @@ class OgreRenderer(BciGenericRenderer):
     @property
     def size(self):
         return (self.width,self.height)
-
+    def get_size(self): return self.size
     @property
     def width(self): return self.viewPort.getActualWidth()
     @property
     def height(self): return self.viewPort.getActualHeight()
-    def get_size(self): return self.size
 
     @property
     def bgcolor(self):
@@ -172,6 +177,28 @@ class OgreRenderer(BciGenericRenderer):
         self._bgcolor = value
         self.viewPort.setBackgroundColour(self._bgcolor)
     color=bgcolor
+
+    @property
+    def coordinate_mapping(self):
+        return self.__coordinate_mapping
+    @coordinate_mapping.setter
+    def coordinate_mapping(self, value):
+        zpos = self.camera.getPosition()[2]
+        cm = value.lower().replace('bottom', 'lower').replace('top', 'upper').replace(' ', '')
+        scrw,scrh = self.size
+        longd = max((scrw,scrh))
+        if cm == 'pixelsfromlowerleft': #VisionEgg default
+            self.camera.setPosition( ogre.Vector3(-scrw/2, scrh/2, zpos) )
+            self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
+        elif cm == 'pixelsfromupperleft': #PygameRenderer default
+            self.camera.setPosition( ogre.Vector3(-scrw/2, -scrh/2, zpos) )
+            self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
+        elif cm == 'pixelsfromcenter': #OgreRenderer default
+            self.camera.setPosition( ogre.Vector3(0, 0, zpos) )
+            self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
+        else:
+            raise ValueError('coordinate_mapping "%s" is unsupported' % value)
+        self.__coordinate_mapping = value
 
     def Cleanup(self):
         #del self.eventListener
@@ -184,17 +211,17 @@ class OgreStimulus(Coords.Box):
     Abstract base class for OGRE3D stimuli.
     """
     def __init__(self, size=None, color=(1,1,1,1), position=(0,0,0), anchor='center', on=True, sticky=False,
-                 ogr=None, sceneManager=None):
+                 ogr=None, sceneManager=None, coordinate_mapping='pixels from lower left'):
         Coords.Box.__init__(self)
         self.ogr = ogr if ogr else ogre.Root.getSingleton()
         self.sceneManager = sceneManager if sceneManager else ogr.getSceneManager("Default SceneManager")
 
-        self._props = {}
         self.anchor = anchor
         self.sticky = False
         self.position = position
         if size: self.size = size
         self.sticky = sticky
+        self.color = color
         self.on = on
 
 class EntityStimulus(OgreStimulus):
@@ -228,24 +255,81 @@ class EntityStimulus(OgreStimulus):
     # variables to position the object in Ogre.
     #=======================================================================
 
+    #size, width, height, depth
+    @property
+    def size(self):
+        wbox = self.entity.getWorldBoundingBox()
+        truesize = wbox.getSize()
+        truesize = tuple([truesize[ix] if truesize[ix]!=0 else 1.0 for ix in range(3)])
+        super(OgreStimulus, self.__class__).size.fset(self, Coords.Point(truesize))
+        return super(OgreStimulus, self).size
+    @size.setter
+    def size(self, value):
+        oldsize = self.size #Get the current size
+        scale = [value[ix]/oldsize[ix] if len(value)>ix else 1.0 for ix in range(3)]
+        newsize = [value[ix] if len(value)>ix else oldsize[ix] for ix in range(3)]
+        super(OgreStimulus, self.__class__).size.fset(self, newsize)
+        self.scale(scale)#Now update the entity's size
+
+    @property
+    def width(self):
+        self.size #update internal representation
+        return super(OgreStimulus, self).width
+    @width.setter
+    def width(self, value):
+        self.size = [value]
+        super(OgreStimulus, self.__class__).width.fset(self, value)
+    @property
+    def height(self):
+        self.size
+        return super(OgreStimulus, self).height
+    @height.setter
+    def height(self, value):
+        oldsize = self.size
+        self.size = [oldsize[0], value]
+        super(OgreStimulus, self.__class__).height.fset(self, value)
+    @property
+    def depth(self):
+        self.size
+        return super(OgreStimulus, self).depth
+    @depth.setter
+    def depth(self, value):
+        oldsize = self.size
+        self.size = [oldsize[0], oldsize[1], value]
+        super(OgreStimulus, self.__class__).depth.fset(self, value)
+    def scale(self, xyz=None, x=None, y=None, z=None):
+        if xyz == None:  xyz = [x,y,z]
+        if not isinstance(xyz, (list,tuple)): xyz = [xyz] * len(self)
+        xyz = list(xyz)
+        for i,val in enumerate(xyz):
+            if val == None: xyz[i] = 1.0
+        xyz += [1.0] * (len(self) - len(xyz))
+        xyz = xyz[:len(self)]
+        self.node.scale(xyz)
+        if any(self.anchor): self.position = self.position
+
+    #position, x, y, z
     @property
     def position(self):
-        temp = self.node.getPosition()
-        super(OgreStimulus, self.__class__).position.fset(self, Coords.Point([temp[0], temp[1], temp[2]]))
+        nodePos = self.node.getPosition()
+        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
+        anchorPos = nodePos+self.anchor*self.size/2
+        super(OgreStimulus, self.__class__).position.fset(self, anchorPos)
         return super(OgreStimulus, self).position
     @position.setter
     def position(self, value):
-        value = Coords.Point(value)
-        self.node.setPosition(value.x, value.y, value.z)
-        super(OgreStimulus, self.__class__).position.fset(self, value)
+        anchorPos = self.position
+        anchorPos[0:len(value)] = value
+        super(OgreStimulus, self.__class__).position.fset(self, anchorPos)
+        nodePos = anchorPos - self.anchor*self.size/2#Unadjust anchor
+        self.node.setPosition(-nodePos[0], nodePos[1], nodePos[2])
     @property
     def x(self):
         self.position #This updates __position with the true position.
         return super(OgreStimulus, self).x
     @x.setter
     def x(self, value):
-        oldpos = self.position
-        self.position = (value, oldpos[1], oldpos[2])
+        self.position = [value]
         super(OgreStimulus, self.__class__).x.fset(self, value)
     @property
     def y(self):
@@ -254,7 +338,7 @@ class EntityStimulus(OgreStimulus):
     @y.setter
     def y(self, value):
         oldpos = self.position
-        self.position = (oldpos[0], value, oldpos[2])
+        self.position = [oldpos[0], value]
         super(OgreStimulus, self.__class__).y.fset(self, value)
     @property
     def z(self):
@@ -263,8 +347,17 @@ class EntityStimulus(OgreStimulus):
     @z.setter
     def z(self, value):
         oldpos = self.position
-        self.position = (oldpos[0], oldpos[1], value)
+        self.position = [oldpos[0], oldpos[1], value]
         super(OgreStimulus, self.__class__).z.fset(self, value)
+
+    @property
+    def anchor(self):
+        return super(OgreStimulus, self).anchor
+    @anchor.setter
+    def anchor(self, value):
+        super(OgreStimulus, self.__class__).anchor.fset(self, value)
+        self.position = super(OgreStimulus, self).position #Auto-update position
+
     @property
     def on(self):
         """Hidden or not"""
@@ -273,12 +366,49 @@ class EntityStimulus(OgreStimulus):
     def on(self, value):
         self.entity.setVisible(value)
 
+    @property
+    def color(self):
+        """Color"""
+        return self.__color
+    @color.setter
+    def color(self, value):
+        if len(value)<4: value = value + (1.0,)
+        r,g,b,a = value[0], value[1], value[2], value[3]
+        nsubs = self.entity.getNumSubEntities()
+        for se_ix in range(nsubs):
+            se = self.entity.getSubEntity(se_ix)
+            mat = se.getMaterial()
+            mat.setAmbient(r,g,b)
+            mat.setDiffuse(r,g,b,a)
+            mat.setSpecular(r,g,b,a)
+            mat.setSelfIllumination(r,g,b)
+        self.__color = value
+
+    def makeMaterialUnique(self, entity):
+        nsubs = entity.getNumSubEntities()
+        matMgr = ogre.MaterialManager.getSingleton()
+        for se_ix in range(nsubs):
+            se = entity.getSubEntity(se_ix)
+            matName = se.getMaterialName()
+            mat = se.getMaterial()
+            uqname = matName + "_" + entity.getName()
+            if matMgr.resourceExists(uqname):
+                newmat = matMgr.getByName(uqname)
+            else:
+                newmat = mat.clone(uqname)
+                #The only reason we'd use this function is to change
+                #the material's color/alpha, so let's enable that
+                newmat.setDepthWriteEnabled(False)
+                newmat.setSceneBlending(ogre.SceneBlendType.SBT_TRANSPARENT_ALPHA)
+            se.setMaterial(newmat)
+
 class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
     Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
     This class is meant to be laterally-compatible with VisionEggRenderer's ImageStimulus class.
     """
     #http://www.ogre3d.org/tikiwiki/tiki-index.php?page=MadMarx+Tutorial+4&structure=Tutorials
+    #http://wiki.python-ogre.org/index.php/Intermediate_Tutorial_4
     def __init__(self, content=None, texture=None, color=(1,1,1,1), **kwargs):
         #Create a manual object from content or texture (which are more appropriate for pygame or visionegg)
         #content might be ???
@@ -366,49 +496,42 @@ class ImageStimulus(EntityStimulus):
 #        mo.convertToMesh("moMesh")
 #        MeshStimulus.__init__(self, mesh_name="moMesh", **kwargs)
 #===============================================================================
-
-    def updatePos(self):
-        self.node.setPosition(-self.x, self.y, self.z)#I don't know why x is in the negative direction.
-
-class Disc(EntityStimulus):
-    def __init__(self, radius=10, **kwargs):
+class PrefabStimulus(EntityStimulus):
+    def __init__(self, pttype="sphere", **kwargs):
         ogr = ogre.Root.getSingleton()
         sceneManager = ogr.getSceneManager("Default SceneManager")
-        entity = sceneManager.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
-        #TODO: Use radius?
+        myix = 0
+        while sceneManager.hasEntity(pttype + "_" + str(myix)):
+            myix += 1
+        if pttype == "sphere":
+            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_SPHERE)
+        elif pttype == "cube":
+            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_CUBE)
+        self.makeMaterialUnique(entity)
         EntityStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, entity=entity, **kwargs)
 
-class Block(ImageStimulus):
+
+class Disc(PrefabStimulus):
+    """ Class to create a 3D Sphere."""
+    def __init__(self, radius=10, **kwargs):
+        PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
+        self.scale(float(radius)/50)#Default sphere has a radius of 50 units
+    @property
+    def radius(self):
+        """Sphere radius."""
+        return self.width/2.0
+    @radius.setter
+    def radius(self, value):
+        self.size = (value*2.0, value*2.0, value*2.0)
+
+class Block(PrefabStimulus):
     """
-    Class to create a 2D rectangle.
-    http://wiki.python-ogre.org/index.php/Intermediate_Tutorial_4
+    Class to create a 3D cube.
     """
     #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
-    def __init__(self, position=(0,0), size=(10, 10), **kwargs):
-        #=======================================================================
-        # ogr = ogre.Root.getSingleton()
-        # renderWindow = ogr.getAutoCreatedWindow()
-        # vp = renderWindow.getViewport(0)
-        # scrw,scrh = float(vp.getActualWidth()), float(vp.getActualHeight()) #800, 600
-        # #sqx = scrw/scrh
-        # new_size = (size[0]/scrw, size[1]/scrh)
-        # myrect = ogre.Rectangle2D(True)
-        # myrect.setCorners(-new_size[0]/2.0,
-        #                  new_size[1]/2.0,
-        #                  new_size[0]/2.0,
-        #                  -new_size[1]/2.0)#l,t,r,b
-        # myrect.setMaterial("Template/Black50")
-        # myrect.setRenderQueueGroup(ogre.RenderQueueGroupID.RENDER_QUEUE_OVERLAY)
-        # MeshStimulus.__init__(self, entity=myrect, **kwargs)
-        #=======================================================================
-        content = [
-                    Coords.Point((position[0]-size[0]/2.0, position[1]-size[1]/2.0)),
-                    Coords.Point((position[0]-size[0]/2.0, position[1]+size[1]/2.0)),
-                    Coords.Point((position[0]+size[0]/2.0, position[1]+size[1]/2.0)),
-                    Coords.Point((position[0]+size[0]/2.0, position[1]-size[1]/2.0))
-                ]
-        ImageStimulus.__init__(self, content=content, size=size, position=position, **kwargs)
-
+    def __init__(self, size=(10,10,10), **kwargs):
+        PrefabStimulus.__init__(self, pttype="cube", **kwargs)
+        self.scale((size[0]/102.0,size[0]/102.0,size[0]/102.0))
 
 class Movie(ImageStimulus):
     def __init__(self, filename, position=(100,100), size=None, **kwargs):
