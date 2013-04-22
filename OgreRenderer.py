@@ -1,10 +1,12 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
-#TODO: Hand Animation
+#TODO: Handle negative sizes
+#TODO: Window placement
 #TODO: Text alternate coordinate frames
 #TODO: PolygonTexture
 #TODO: Keyboard events passed to application
 #TODO: Framerate
 #TODO: Fonts
+#TODO: Why is right -x?
 
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
@@ -33,11 +35,10 @@ class OgreRenderer(BciGenericRenderer):
         self._bci = None
 
     def setup(self, left = None, top = None, width = None, height = None,
-        bgcolor = None, framerate = None, changemode = None,
-        frameless_window = None, always_on_top = None, title=None,
-        plugins_path = 'plugins.cfg.nt', resource_path = 'resources.cfg',
-        coordinate_mapping = 'pixels from center',
-        **kwds):
+            bgcolor = None, framerate = None, changemode = None,
+            frameless_window = None, always_on_top = None, title=None,
+            plugins_path = '.\\BCPyOgreRenderer\\plugins.cfg.nt', resource_path = '.\\BCPyOgreRenderer\\resources.cfg',
+            coordinate_mapping = 'pixels from center', **kwds):
         #Set any constants that may come from the parameters.
         #Called during application preflight on the main thread
         self.plugins_path = plugins_path
@@ -65,7 +66,7 @@ class OgreRenderer(BciGenericRenderer):
     def defineResources(self):
         rgm = ogre.ResourceGroupManager.getSingleton()
         cf = ogre.ConfigFile()
-
+        print self.resource_path
         cf.load(self.resource_path)
         seci = cf.getSectionIterator()
         while seci.hasMoreElements():
@@ -265,44 +266,47 @@ class EntityStimulus(OgreStimulus):
     def size(self):
         wbox = self.entity.getWorldBoundingBox()
         truesize = wbox.getSize()
-        truesize = tuple([truesize[ix] if truesize[ix]!=0 else 1.0 for ix in range(3)])
-        super(OgreStimulus, self.__class__).size.fset(self, Coords.Point(truesize))
+        truesize = (truesize[0], truesize[1], truesize[2])#Some might be zero!
+        super(OgreStimulus, self.__class__).size.fset(self, Coords.Size(truesize))
         return super(OgreStimulus, self).size
     @size.setter
     def size(self, value):
-        oldsize = self.size #Get the current size
-        scale = [value[ix]/oldsize[ix] if len(value)>ix else 1.0 for ix in range(3)]
-        newsize = [value[ix] if len(value)>ix else oldsize[ix] for ix in range(3)]
-        super(OgreStimulus, self.__class__).size.fset(self, newsize)
-        self.scale(scale)#Now update the entity's size
-
+        if len(value)<3: value = value + (None,)
+        self.scale(newsize=value)#Scale to change the entity's size
     @property
     def width(self):
         self.size #update internal representation
         return super(OgreStimulus, self).width
     @width.setter
     def width(self, value):
-        self.size = [value]
-        super(OgreStimulus, self.__class__).width.fset(self, value)
+        self.size = (value, None, None)
     @property
     def height(self):
         self.size
         return super(OgreStimulus, self).height
     @height.setter
     def height(self, value):
-        oldsize = self.size
-        self.size = [oldsize[0], value]
-        super(OgreStimulus, self.__class__).height.fset(self, value)
+        self.size = (None, value, None)
     @property
     def depth(self):
         self.size
         return super(OgreStimulus, self).depth
     @depth.setter
     def depth(self, value):
-        oldsize = self.size
-        self.size = [oldsize[0], oldsize[1], value]
-        super(OgreStimulus, self.__class__).depth.fset(self, value)
-    def scale(self, xyz=None, x=None, y=None, z=None):
+        self.size = (None, None, value)
+    def scale(self, xyz=None, x=None, y=None, z=None, newsize=None):
+        myAnchor = self.anchor
+        if newsize or any(myAnchor):
+            #Get the current size
+            wbox = self.entity.getWorldBoundingBox()
+            oldsize = wbox.getSize()
+            oldsize = (oldsize[0], oldsize[1], oldsize[2])#Some might be zero!
+            oldsizefix = [os if os>0 else 1.0 for os in oldsize] #Can't divide by 0
+            if newsize:#If called from the size function
+                newsize = [new if new else old for new,old in zip(newsize,oldsize)]#Replace newsize None's with old values
+                super(OgreStimulus, self.__class__).size.fset(self, Coords.Size(newsize))
+                newsizefix = [new if new>0 else 1.0 for new in newsize] #If we scale to 0, we can never unscale.
+                xyz = [new/old for new,old in zip(newsizefix,oldsizefix)]
         if xyz == None:  xyz = [x,y,z]
         if not isinstance(xyz, (list,tuple)): xyz = [xyz] * len(self)
         xyz = list(xyz)
@@ -310,8 +314,15 @@ class EntityStimulus(OgreStimulus):
             if val == None: xyz[i] = 1.0
         xyz += [1.0] * (len(self) - len(xyz))
         xyz = xyz[:len(self)]
+        #Reposition before scaling if we are using a non-center anchor
+        if any(myAnchor):
+            newsizefix = [old*scale for old,scale in zip(oldsizefix,xyz)]
+            nodePos = self.node.getPosition()#Current center position
+            nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
+            anchorPos = nodePos + myAnchor*oldsizefix/2#Current anchor position
+            newNodePos = anchorPos - myAnchor*newsizefix/2#Unadjust with newsize
+            self.node.setPosition(-newNodePos[0], newNodePos[1], newNodePos[2])
         self.node.scale(xyz)
-        if any(self.anchor): self.position = self.position
 
     #position, x, y, z
     @property
@@ -323,37 +334,34 @@ class EntityStimulus(OgreStimulus):
         return super(OgreStimulus, self).position
     @position.setter
     def position(self, value):
-        anchorPos = self.position
-        anchorPos[0:len(value)] = value
+        nodePos = self.node.getPosition()
+        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
+        anchorPos = nodePos+self.anchor*self.size/2 #Current position
+        newAnchorPos = [new if new else old for new,old in zip(value,anchorPos)] #Desired position
         super(OgreStimulus, self.__class__).position.fset(self, anchorPos)
-        nodePos = anchorPos - self.anchor*self.size/2#Unadjust anchor
-        self.node.setPosition(-nodePos[0], nodePos[1], nodePos[2])
+        newNodePos = newAnchorPos - self.anchor*self.size/2#Unadjust anchor
+        self.node.setPosition(-newNodePos[0], newNodePos[1], newNodePos[2])
     @property
     def x(self):
         self.position #This updates __position with the true position.
         return super(OgreStimulus, self).x
     @x.setter
     def x(self, value):
-        self.position = [value]
-        super(OgreStimulus, self.__class__).x.fset(self, value)
+        self.position = (value, None, None)
     @property
     def y(self):
         self.position #This updates __position with the true position.
         return super(OgreStimulus, self).y
     @y.setter
     def y(self, value):
-        oldpos = self.position
-        self.position = [oldpos[0], value]
-        super(OgreStimulus, self.__class__).y.fset(self, value)
+        self.position = (None, value, None)
     @property
     def z(self):
         self.position #This updates __position with the true position.
         return super(OgreStimulus, self).z
     @z.setter
     def z(self, value):
-        oldpos = self.position
-        self.position = [oldpos[0], oldpos[1], value]
-        super(OgreStimulus, self.__class__).z.fset(self, value)
+        self.position = (None, None, value)
 
     @property
     def anchor(self):
@@ -377,8 +385,9 @@ class EntityStimulus(OgreStimulus):
         return self.__color
     @color.setter
     def color(self, value):
+        value = tuple(value)
         if len(value)<4: value = value + (1.0,)
-        r,g,b,a = value[0], value[1], value[2], value[3]
+        r,g,b,a = float(value[0]), float(value[1]), float(value[2]), float(value[3])
         nsubs = self.entity.getNumSubEntities()
         for se_ix in range(nsubs):
             se = self.entity.getSubEntity(se_ix)
@@ -627,7 +636,8 @@ class Text(object):
         #Now update its properties based on input. User property setters where possible.
         self.anchor = anchor
         self.text = text
-        self.font_name = font_name
+        #self.font_name = font_name #TODO: Fonts!
+        self.font_name = "BlueHighway"
         self.font_size = font_size
         self.color = color
         self.size = (len(text)*font_size/(16.0/6),font_size)
