@@ -1,4 +1,6 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
+#TODO: Hand Animation
+#TODO: Text alternate coordinate frames
 #TODO: PolygonTexture
 #TODO: Keyboard events passed to application
 #TODO: Framerate
@@ -95,7 +97,7 @@ class OgreRenderer(BciGenericRenderer):
     def setupScene(self):
         #Create and configure the scene manager
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
-        self.sceneManager.setAmbientLight(ogre.ColourValue(0.7, 0.7, 0.7))
+        self.sceneManager.setAmbientLight(ogre.ColourValue(0.9, 0.9, 0.9))
         #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
         #self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
 
@@ -116,9 +118,9 @@ class OgreRenderer(BciGenericRenderer):
         #Add a light source
         self.light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
-        self.light.diffuseColour = 1, 1, 1
-        self.light.specularColour = 1, 1, 1
+        self.light.setPosition ( ogre.Vector3(-scrw, scrh, -longd/5.0) )
+        self.light.diffuseColour = 0.5, 0.5, 0.5
+        self.light.specularColour = 0.3, 0.3, 0.3
 
         self.coordinate_mapping = self.__coordinate_mapping
 
@@ -189,13 +191,16 @@ class OgreRenderer(BciGenericRenderer):
         longd = max((scrw,scrh))
         if cm == 'pixelsfromlowerleft': #VisionEgg default
             self.camera.setPosition( ogre.Vector3(-scrw/2, scrh/2, zpos) )
-            self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
+            #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
+            self.light.setPosition ( ogre.Vector3(-scrw, scrh, -longd) )
         elif cm == 'pixelsfromupperleft': #PygameRenderer default
             self.camera.setPosition( ogre.Vector3(-scrw/2, -scrh/2, zpos) )
-            self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
+            #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
+            self.light.setPosition ( ogre.Vector3(-scrw, -scrh, -longd) )
         elif cm == 'pixelsfromcenter': #OgreRenderer default
             self.camera.setPosition( ogre.Vector3(0, 0, zpos) )
-            self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
+            #self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
+            self.light.setPosition ( ogre.Vector3(-scrw/2, scrh/2, -longd/5.0) )
         else:
             raise ValueError('coordinate_mapping "%s" is unsupported' % value)
         self.__coordinate_mapping = value

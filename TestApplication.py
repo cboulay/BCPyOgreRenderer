@@ -1,6 +1,7 @@
+import math
 import numpy
 import OgreRenderer
-import ogre.io.OIS as OIS
+import ogre.renderer.OGRE as ogre
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 
 #################################################################
@@ -56,19 +57,19 @@ class BciApplication(BciGenericApplication):
         # addstatemonitor(self, 'Running', showtime=True)
         #=======================================================================
 
-        #=======================================================================
-        # EntityStimulus = OgreRenderer.EntityStimulus
-        # self.stimulus('hand', EntityStimulus, mesh_name='hand.mesh', position=(400,300))
-        # self.stimuli['hand'].scale(50.0)
-        #=======================================================================
+        EntityStimulus = OgreRenderer.EntityStimulus
+        self.stimulus('hand', HandStimulus, mesh_name='hand.mesh', position=(400,300))
+        hand = self.stimuli['hand']
 
         #=======================================================================
         # Disc = self.VisualStimuli.Disc
         # self.stimulus('cursor1',  z=3,   stim=Disc(position=(400,300), radius=20, color=(1,1,1), on=True))
         #=======================================================================
 
-        Block = self.VisualStimuli.Block
-        self.stimulus('block',z=2, stim= Block(position = (400,300), size = (100,50), color=(1, 0.1, 0.1, 0.5), on=True))
+        #=======================================================================
+        # Block = self.VisualStimuli.Block
+        # self.stimulus('block',z=2, stim= Block(position = (400,300), size = (100,50), color=(1, 0.1, 0.1, 0.5), on=True))
+        #=======================================================================
 
         #b = box(size=siz, position=(scrw/2.0,scrh/2.0 - siz[1]/6.0), sticky=True)
         #triangle = PolygonTexture(frame=b, vertices=((0,1),(1,1),(0.5,0)), color=(0,0,0,0.5))
@@ -114,9 +115,12 @@ class BciApplication(BciGenericApplication):
     #############################################################
 
     def Event(self, phase, event):
-        # respond to OIS events
-        if event.isKeyDown(OIS.KC_ESCAPE):
-            print "Escape Pressed"
+        pass
+        #=======================================================================
+        # # respond to OIS events
+        # if event.isKeyDown(OIS.KC_ESCAPE):
+        #    print "Escape Pressed"
+        #=======================================================================
 
     #############################################################
 
@@ -125,3 +129,52 @@ class BciApplication(BciGenericApplication):
 
 #################################################################
 #################################################################
+
+class HandStimulus(OgreRenderer.EntityStimulus):
+    def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
+        OgreRenderer.EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
+        self.scale(80.0)
+        self.node.roll(-1.1*math.pi/2)
+        self.node.pitch(-1.1*math.pi/2)
+        self.importPoses(n_poses)
+        self.setPose(0)
+
+    def importPoses(self, n_poses=100):
+        import json
+        pfile = open('media/libhand/poses/stop_it.json')
+        extended_rot = json.load(pfile)
+        extended_rot = extended_rot["hand_joints"]
+        pfile.close()
+        #extended_rot are joint angles to apply to the default position
+
+        #Get the starting orientation in quaternions
+        skel = self.entity.getSkeleton()
+        starting_q = {}
+        for key in extended_rot:
+            bone = skel.getBone(key)
+            starting_q[key] = bone.getOrientation()
+            bone.setManuallyControlled(True)
+
+        #Get the iterated orientation in quaternions
+        self.poses = []
+        for ix in range(n_poses+1):
+            pose_i = {}
+            for key in extended_rot:
+                #Reset the bone
+                bone = skel.getBone(key)
+                bone.setOrientation(starting_q[key])
+                #Rotate the bone and save its new orientation
+                interp_rot = [p*ix/n_poses for p in extended_rot[key]] #Starting is 0 so it's OK
+                m = ogre.Matrix3()
+                m.FromEulerAnglesXYZ(interp_rot[0], interp_rot[1], interp_rot[2])
+                q = ogre.Quaternion(m)
+                bone.rotate(q)
+                pose_i[key] = bone.getOrientation()
+            self.poses.append(pose_i)
+
+    def setPose(self, pose_ix):
+        skel = self.entity.getSkeleton()
+        pose = self.poses[pose_ix]
+        for key in pose: #key = "finger4joint2"
+            bone = skel.getBone(key)
+            bone.setOrientation(pose[key])
