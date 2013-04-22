@@ -407,6 +407,91 @@ class EntityStimulus(OgreStimulus):
                 newmat.setSceneBlending(ogre.SceneBlendType.SBT_TRANSPARENT_ALPHA)
             se.setMaterial(newmat)
 
+class HandStimulus(EntityStimulus):
+    def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
+        OgreRenderer.EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
+        self.scale(80.0)
+        self.node.roll(-1.1*math.pi/2)
+        self.node.pitch(-1.1*math.pi/2)
+        self.importPoses(n_poses)
+        self.setPose(0)
+
+    def importPoses(self, n_poses=100):
+        import json
+        pfile = open('media/libhand/poses/stop_it.json')
+        extended_rot = json.load(pfile)
+        extended_rot = extended_rot["hand_joints"]
+        pfile.close()
+        #extended_rot are joint angles to apply to the default position
+
+        #Get the starting orientation in quaternions
+        skel = self.entity.getSkeleton()
+        starting_q = {}
+        for key in extended_rot:
+            bone = skel.getBone(key)
+            starting_q[key] = bone.getOrientation()
+            bone.setManuallyControlled(True)
+
+        #Get the iterated orientation in quaternions
+        self.poses = []
+        for ix in range(n_poses+1):
+            pose_i = {}
+            for key in extended_rot:
+                #Reset the bone
+                bone = skel.getBone(key)
+                bone.setOrientation(starting_q[key])
+                #Rotate the bone and save its new orientation
+                interp_rot = [p*ix/n_poses for p in extended_rot[key]] #Starting is 0 so it's OK
+                m = ogre.Matrix3()
+                m.FromEulerAnglesXYZ(interp_rot[0], interp_rot[1], interp_rot[2])
+                q = ogre.Quaternion(m)
+                bone.rotate(q)
+                pose_i[key] = bone.getOrientation()
+            self.poses.append(pose_i)
+
+    def setPose(self, pose_ix):
+        skel = self.entity.getSkeleton()
+        pose = self.poses[pose_ix]
+        for key in pose: #key = "finger4joint2"
+            bone = skel.getBone(key)
+            bone.setOrientation(pose[key])
+
+class PrefabStimulus(EntityStimulus):
+    def __init__(self, pttype="sphere", **kwargs):
+        ogr = ogre.Root.getSingleton()
+        sceneManager = ogr.getSceneManager("Default SceneManager")
+        myix = 0
+        while sceneManager.hasEntity(pttype + "_" + str(myix)):
+            myix += 1
+        if pttype == "sphere":
+            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_SPHERE)
+        elif pttype == "cube":
+            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_CUBE)
+        self.makeMaterialUnique(entity)
+        EntityStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, entity=entity, **kwargs)
+
+class Disc(PrefabStimulus):
+    """ Class to create a 3D Sphere."""
+    def __init__(self, radius=10, **kwargs):
+        PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
+        self.scale(float(radius)/50)#Default sphere has a radius of 50 units
+    @property
+    def radius(self):
+        """Sphere radius."""
+        return self.width/2.0
+    @radius.setter
+    def radius(self, value):
+        self.size = (value*2.0, value*2.0, value*2.0)
+
+class Block(PrefabStimulus):
+    """
+    Class to create a 3D cube.
+    """
+    #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
+    def __init__(self, size=(10,10,10), **kwargs):
+        PrefabStimulus.__init__(self, pttype="cube", **kwargs)
+        self.scale((size[0]/102.0,size[0]/102.0,size[0]/102.0))
+
 class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
     Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
@@ -501,42 +586,6 @@ class ImageStimulus(EntityStimulus):
 #        mo.convertToMesh("moMesh")
 #        MeshStimulus.__init__(self, mesh_name="moMesh", **kwargs)
 #===============================================================================
-class PrefabStimulus(EntityStimulus):
-    def __init__(self, pttype="sphere", **kwargs):
-        ogr = ogre.Root.getSingleton()
-        sceneManager = ogr.getSceneManager("Default SceneManager")
-        myix = 0
-        while sceneManager.hasEntity(pttype + "_" + str(myix)):
-            myix += 1
-        if pttype == "sphere":
-            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_SPHERE)
-        elif pttype == "cube":
-            entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_CUBE)
-        self.makeMaterialUnique(entity)
-        EntityStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, entity=entity, **kwargs)
-
-
-class Disc(PrefabStimulus):
-    """ Class to create a 3D Sphere."""
-    def __init__(self, radius=10, **kwargs):
-        PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
-        self.scale(float(radius)/50)#Default sphere has a radius of 50 units
-    @property
-    def radius(self):
-        """Sphere radius."""
-        return self.width/2.0
-    @radius.setter
-    def radius(self, value):
-        self.size = (value*2.0, value*2.0, value*2.0)
-
-class Block(PrefabStimulus):
-    """
-    Class to create a 3D cube.
-    """
-    #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
-    def __init__(self, size=(10,10,10), **kwargs):
-        PrefabStimulus.__init__(self, pttype="cube", **kwargs)
-        self.scale((size[0]/102.0,size[0]/102.0,size[0]/102.0))
 
 class Movie(ImageStimulus):
     def __init__(self, filename, position=(100,100), size=None, **kwargs):
