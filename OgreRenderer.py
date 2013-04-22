@@ -409,8 +409,9 @@ class EntityStimulus(OgreStimulus):
 
 class HandStimulus(EntityStimulus):
     def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
-        OgreRenderer.EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
+        EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         self.scale(80.0)
+        import math
         self.node.roll(-1.1*math.pi/2)
         self.node.pitch(-1.1*math.pi/2)
         self.importPoses(n_poses)

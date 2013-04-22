@@ -49,10 +49,10 @@ class BciApplication(BciGenericApplication):
 
         #=======================================================================
         # Text = self.VisualStimuli.Text   # the convention is that the self.VisualStimuli "virtual module"
-        #                                 # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
+        #                                # contains at least Text, Disc, Block and ImageStimulus classes for all renderers
         # self.stimulus('SomeText', Text, text='BCPy2000: Python bindings for your brain',
-        #                                position=(300, 100),
-        #                                anchor='right'         )
+        #                               position=(300, 100),
+        #                               anchor='right'         )
         # addstatemonitor(self, 'Running', showtime=True)
         #=======================================================================
 
