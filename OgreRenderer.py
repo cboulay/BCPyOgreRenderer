@@ -1,5 +1,5 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
-#TODO: Handle negative sizes
+#TODO: Fix box and sphere initial loading with wrong size.
 #TODO: Window placement
 #TODO: Text alternate coordinate frames
 #TODO: PolygonTexture
@@ -212,164 +212,125 @@ class OgreRenderer(BciGenericRenderer):
 
 BciGenericRenderer.subclass = OgreRenderer
 
-class OgreStimulus(Coords.Box):
+class EntityStimulus(Coords.Box):
+    """Creates a 3D Ogre object using provided mesh or entity.
     """
-    Abstract base class for OGRE3D stimuli.
-    """
-    def __init__(self, size=None, color=(1,1,1,1), position=(0,0,0), anchor='center', on=True, sticky=False,
-                 ogr=None, sceneManager=None, coordinate_mapping='pixels from lower left'):
+    def __init__(self, mesh_name='hand.mesh', entity=None, parent=None,
+                 size=(1,1,1), color=(1,1,1,1), position=(0,0,0), anchor='center', on=True, sticky=False,
+                 **kwargs):
         Coords.Box.__init__(self)
-        self.ogr = ogr if ogr else ogre.Root.getSingleton()
-        self.sceneManager = sceneManager if sceneManager else ogr.getSceneManager("Default SceneManager")
+        self.ogr = ogre.Root.getSingleton()
+        self.sceneManager = self.ogr.getSceneManager("Default SceneManager")
+        self.entity = entity if entity else self.sceneManager.createEntity(mesh_name + 'Entity', mesh_name)
+        parent = parent if parent else self.sceneManager.getRootSceneNode()
+        self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
+        self.node.attachObject(self.entity)
 
-        self.anchor = anchor
-        self.sticky = False
-        self.position = position
-        if size: self.size = size
-        self.sticky = sticky
+        #Set desired anchor, position, and size then reset
+        super(EntityStimulus, self.__class__).anchor.fset(self, anchor)
+        super(EntityStimulus, self.__class__).position.fset(self, position)
+        self.sticky = sticky#This doesn't affect anything so we can use the direct access
+        self.size = size#This will cause the reset
         self.color = color
         self.on = on
 
-class EntityStimulus(OgreStimulus):
-    """Creates an OgreStimulus using provided mesh or entity.
-    Here we overshadow the property setters and getters
-    so that they point to the node and/or entity properties
-    while still interfacing with the hidden variables for
-    interfacing various coordinate frames."""
-    def __init__(self, mesh_name='hand.mesh', ogr=None, sceneManager=None, entity=None, parent=None, **kwargs):
-        ogr = ogr if ogr else ogre.Root.getSingleton()
-        sceneManager = sceneManager if sceneManager else ogr.getSceneManager("Default SceneManager")
-        self.entity = entity if entity else sceneManager.createEntity(mesh_name + 'Entity', mesh_name)
-        parent = parent if parent else sceneManager.getRootSceneNode()
-        self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
-        self.node.attachObject(self.entity)
-        OgreStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, **kwargs)
-
-    #=======================================================================
-    # From Coords.Box we inherit:
-    # self.rect, .lims, .position, .x, .y, .z,
-    # .size, .width, .height, .depth, .anchor, .anchorstr,
-    # .left, .right, .top, .bottom, .near, .far, .internal
-    # These getters and setters operate on internal properties:
-    # self.__size, .__position, .__anchor
-    # .__anchorstr, .__sticky, .__internal
-    # Typically, a BCPy2000 application will operate on its stimuli as follows:
-    # my_stim = app.stimuli['my_stim']
-    # my_stim.x = 100
-    # This does nothing except update the internal variables.
-    # For this to be meaningful, we have to use the information in the internal
-    # variables to position the object in Ogre.
-    #=======================================================================
-
     #size, width, height, depth
+    def reset(self):
+        desiredSize = super(EntityStimulus, self).size
+        anch = super(EntityStimulus, self).anchor
+        desiredAnchPos = super(EntityStimulus, self).position
+        #Account for negative sizes
+        negDim = [x<0 for x in desiredSize]
+        desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
+        desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
+        #Scale
+        self.node.setScale(desiredSize[0],desiredSize[1],desiredSize[2])
+        #Position
+        anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
+        desiredNodePos = desiredAnchPos - anch*desiredSize/2#Unadjust the anchor position to get node position
+        self.node.setPosition(-desiredNodePos[0],desiredNodePos[1],desiredNodePos[2])
+
     @property
     def size(self):
         wbox = self.entity.getWorldBoundingBox()
-        truesize = wbox.getSize()
-        truesize = (truesize[0], truesize[1], truesize[2])#Some might be zero!
-        super(OgreStimulus, self.__class__).size.fset(self, Coords.Size(truesize))
-        return super(OgreStimulus, self).size
+        trueSize = wbox.getSize()
+        trueSize = (trueSize[0], trueSize[1], trueSize[2])#Convert from Ogre to tuple
+        #trueSize = [ts if ts else 1.0 for ts in trueSize]#Replace 0's with 1's on recently instantiated objects
+        super(EntityStimulus, self.__class__).size.fset(self, trueSize)
+        return super(EntityStimulus, self).size
     @size.setter
     def size(self, value):
-        if len(value)<3: value = value + (None,)
-        self.scale(newsize=value)#Scale to change the entity's size
+        value = tuple(value)
+        while len(value)<3: value = value + (None,) #Fill out til it's 3D
+        value = tuple([x if x and x!=0 else 1.0 for x in value])#Replace 0/None's with 1's
+        super(EntityStimulus, self.__class__).size.fset(self, value)
+        self.reset()
     @property
     def width(self):
-        self.size #update internal representation
-        return super(OgreStimulus, self).width
+        return self.size.x #Returns updated representation
     @width.setter
     def width(self, value):
-        self.size = (value, None, None)
+        super(EntityStimulus, self.__class__).width.fset(self, value)
+        self.reset()
     @property
     def height(self):
-        self.size
-        return super(OgreStimulus, self).height
+        return self.size.y
     @height.setter
     def height(self, value):
-        self.size = (None, value, None)
+        super(EntityStimulus, self.__class__).height.fset(self, value)
+        self.reset()
     @property
     def depth(self):
-        self.size
-        return super(OgreStimulus, self).depth
+        return self.size.z
     @depth.setter
     def depth(self, value):
-        self.size = (None, None, value)
-    def scale(self, xyz=None, x=None, y=None, z=None, newsize=None):
-        myAnchor = self.anchor
-        if newsize or any(myAnchor):
-            #Get the current size
-            wbox = self.entity.getWorldBoundingBox()
-            oldsize = wbox.getSize()
-            oldsize = (oldsize[0], oldsize[1], oldsize[2])#Some might be zero!
-            oldsizefix = [os if os>0 else 1.0 for os in oldsize] #Can't divide by 0
-            if newsize:#If called from the size function
-                newsize = [new if new else old for new,old in zip(newsize,oldsize)]#Replace newsize None's with old values
-                super(OgreStimulus, self.__class__).size.fset(self, Coords.Size(newsize))
-                newsizefix = [new if new>0 else 1.0 for new in newsize] #If we scale to 0, we can never unscale.
-                xyz = [new/old for new,old in zip(newsizefix,oldsizefix)]
-        if xyz == None:  xyz = [x,y,z]
-        if not isinstance(xyz, (list,tuple)): xyz = [xyz] * len(self)
-        xyz = list(xyz)
-        for i,val in enumerate(xyz):
-            if val == None: xyz[i] = 1.0
-        xyz += [1.0] * (len(self) - len(xyz))
-        xyz = xyz[:len(self)]
-        #Reposition before scaling if we are using a non-center anchor
-        if any(myAnchor):
-            newsizefix = [old*scale for old,scale in zip(oldsizefix,xyz)]
-            nodePos = self.node.getPosition()#Current center position
-            nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
-            anchorPos = nodePos + myAnchor*oldsizefix/2#Current anchor position
-            newNodePos = anchorPos - myAnchor*newsizefix/2#Unadjust with newsize
-            self.node.setPosition(-newNodePos[0], newNodePos[1], newNodePos[2])
-        self.node.scale(xyz)
+        super(EntityStimulus, self.__class__).depth.fset(self, value)
+        self.reset()
 
     #position, x, y, z
     @property
     def position(self):
-        nodePos = self.node.getPosition()
-        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
-        anchorPos = nodePos+self.anchor*self.size/2
-        super(OgreStimulus, self.__class__).position.fset(self, anchorPos)
-        return super(OgreStimulus, self).position
+        nodePos = self.node.getPosition() #Get the true position
+        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
+        anchorPos = nodePos+self.anchor*self.size/2 #Adjust for the anchor
+        super(EntityStimulus, self.__class__).position.fset(self, anchorPos) #Save internally
+        return super(EntityStimulus, self).position
     @position.setter
     def position(self, value):
-        nodePos = self.node.getPosition()
-        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]])
-        anchorPos = nodePos+self.anchor*self.size/2 #Current position
-        newAnchorPos = [new if new else old for new,old in zip(value,anchorPos)] #Desired position
-        super(OgreStimulus, self.__class__).position.fset(self, anchorPos)
-        newNodePos = newAnchorPos - self.anchor*self.size/2#Unadjust anchor
-        self.node.setPosition(-newNodePos[0], newNodePos[1], newNodePos[2])
+        #Account for None in value
+        currAnchPos = self.position
+        newAnchPos = [new if new else old for new,old in zip(value,currAnchPos)]
+        super(EntityStimulus, self.__class__).position.fset(self, newAnchPos)
+        self.reset()
     @property
     def x(self):
-        self.position #This updates __position with the true position.
-        return super(OgreStimulus, self).x
+        return self.position.x #This updates __position with the true position.
     @x.setter
     def x(self, value):
-        self.position = (value, None, None)
+        super(EntityStimulus, self.__class__).x.fset(self, value)
+        self.reset()
     @property
     def y(self):
-        self.position #This updates __position with the true position.
-        return super(OgreStimulus, self).y
+        return self.position.y #This updates __position with the true position.
     @y.setter
     def y(self, value):
-        self.position = (None, value, None)
+        super(EntityStimulus, self.__class__).y.fset(self, value)
+        self.reset()
     @property
     def z(self):
-        self.position #This updates __position with the true position.
-        return super(OgreStimulus, self).z
+        return self.position.z #This updates __position with the true position.
     @z.setter
     def z(self, value):
-        self.position = (None, None, value)
+        super(EntityStimulus, self.__class__).z.fset(self, value)
+        self.reset()
 
     @property
     def anchor(self):
-        return super(OgreStimulus, self).anchor
+        return super(EntityStimulus, self).anchor
     @anchor.setter
     def anchor(self, value):
-        super(OgreStimulus, self.__class__).anchor.fset(self, value)
-        self.position = super(OgreStimulus, self).position #Auto-update position
+        super(EntityStimulus, self.__class__).anchor.fset(self, value)
+        self.reset()
 
     @property
     def on(self):
@@ -385,6 +346,7 @@ class EntityStimulus(OgreStimulus):
         return self.__color
     @color.setter
     def color(self, value):
+        #Might not have much of an effect depending on material type
         value = tuple(value)
         if len(value)<4: value = value + (1.0,)
         r,g,b,a = float(value[0]), float(value[1]), float(value[2]), float(value[3])
@@ -478,13 +440,15 @@ class PrefabStimulus(EntityStimulus):
         elif pttype == "cube":
             entity = sceneManager.createEntity(pttype + "_" + str(myix), ogre.SceneManager.PT_CUBE)
         self.makeMaterialUnique(entity)
-        EntityStimulus.__init__(self, ogr=ogr, sceneManager=sceneManager, entity=entity, **kwargs)
+        EntityStimulus.__init__(self, entity=entity, **kwargs)
 
 class Disc(PrefabStimulus):
     """ Class to create a 3D Sphere."""
     def __init__(self, radius=10, **kwargs):
+        #kwargs['size'] = (2*radius,2*radius,2*radius)
         PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
-        self.scale(float(radius)/50)#Default sphere has a radius of 50 units
+        self.radius = radius
+
     @property
     def radius(self):
         """Sphere radius."""
@@ -499,8 +463,9 @@ class Block(PrefabStimulus):
     """
     #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
     def __init__(self, size=(10,10,10), **kwargs):
+        #kwargs['size'] = (1,1,1) #Will init with default size of 102,102,102
         PrefabStimulus.__init__(self, pttype="cube", **kwargs)
-        self.scale((size[0]/102.0,size[0]/102.0,size[0]/102.0))
+        self.size = size
 
 class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
