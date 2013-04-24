@@ -58,7 +58,7 @@ class BciApplication(BciGenericApplication):
         #=======================================================================
 
         HandStimulus = OgreRenderer.HandStimulus
-        self.stimulus('hand', HandStimulus, mesh_name='hand.mesh', position=(400,300))
+        self.stimulus('hand', HandStimulus, position=(400,300))
         hand = self.stimuli['hand']
 
         #=======================================================================

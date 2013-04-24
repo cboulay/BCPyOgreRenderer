@@ -350,6 +350,10 @@ class EntityStimulus(Coords.Box):
     def depth(self, value):
         super(EntityStimulus, self.__class__).depth.fset(self, value)
         self.reset()
+    def scale(self, value):
+        if not isinstance(value, (tuple,list)): value = tuple([value])
+        while len(value)<3: value = value + (value[-1], )
+        self.size = self.size * value
 
     #position, x, y, z
     @property
@@ -445,7 +449,10 @@ class EntityStimulus(Coords.Box):
 class HandStimulus(EntityStimulus):
     def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
-        self.scale(80.0)
+        #The Hand's bounding box is not indicative of its size.
+        self._EntityStimulus__original_size = Coords.Size((1.5189208984375, 1.2220458984375, 1.366025447845459))
+        #self.size = self._EntityStimulus__original_size * 80
+        self.scale(80)
         import math
         self.node.roll(-80*math.pi/180)
         self.node.pitch(60*math.pi/180)
@@ -1031,8 +1038,10 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         if self.Keyboard.isKeyDown(OIS.KC_LEFT):
             self.rotationX = self.rotationScale
 
-        if self.Keyboard.isKeyDown(OIS.KC_ESCAPE) or self.Keyboard.isKeyDown(OIS.KC_Q):
-            return False
+        #=======================================================================
+        # if self.Keyboard.isKeyDown(OIS.KC_ESCAPE) or self.Keyboard.isKeyDown(OIS.KC_Q):
+        #    return False
+        #=======================================================================
 
         if( self.Keyboard.isKeyDown(OIS.KC_F) and self.timeUntilNextToggle <= 0 ):
              self.statisticsOn = not self.statisticsOn
