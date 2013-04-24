@@ -188,26 +188,31 @@ class Application(object):
         self.camera = self.sceneManager.createCamera("Camera")
         self.viewPort = self.root.getAutoCreatedWindow().addViewport(self.camera)
 
-        self.camera.setPosition(ogre.Vector3(0, 100, -400))
-        self.camera.lookAt(ogre.Vector3(0, 0, 1))
-
+        self.camera.setPosition(ogre.Vector3(0, 0, 400))
+        self.camera.lookAt(ogre.Vector3(0, 0, 0))
 
         self.sceneManager.setAmbientLight(ogre.ColourValue(0.7,0.7,0.7))
-        self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
-        self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0002)
+        #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
+        #self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0002)
         self.light = self.sceneManager.createLight( 'lightMain')
         self.light.setPosition ( ogre.Vector3(20, 80, 50) )
 
         self.rn = self.sceneManager.getRootSceneNode()
 
-        self.entityOgre = self.sceneManager.createEntity('Ogre','ogrehead.mesh')
-        self.nodeOgre = self.rn.createChildSceneNode('nodeOgre')
-        self.nodeOgre.setPosition(ogre.Vector3(0, 0, 0))
-        self.nodeOgre.attachObject(self.entityOgre)
+        #=======================================================================
+        # self.entityOgre = self.sceneManager.createEntity('Ogre','ogrehead.mesh')
+        # self.nodeOgre = self.rn.createChildSceneNode('nodeOgre')
+        # self.nodeOgre.setPosition(ogre.Vector3(0, 0, 0))
+        # self.nodeOgre.attachObject(self.entityOgre)
+        #=======================================================================
 
         self.entitySphere = self.sceneManager.createEntity("mySphere",ogre.SceneManager.PT_SPHERE)
-        self.nodeSphere = self.rn.createChildSceneNode("mySphere" + 'Node', (0,0,0))
+        print self.entitySphere.getBoundingBox().getSize()
+        self.nodeSphere = self.rn.createChildSceneNode("nodeSphere")
+        self.nodeSphere.setPosition(ogre.Vector3(0, 0, 0))
         self.nodeSphere.attachObject(self.entitySphere)
+        print self.entitySphere.getWorldBoundingBox().getSize()
+        self.nodeSphere.setScale(1./50,1./50,1./50)
 
 
     def createFrameListener(self):

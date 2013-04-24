@@ -73,6 +73,8 @@ class BciApplication(BciGenericApplication):
 
         #b = box(size=siz, position=(scrw/2.0,scrh/2.0 - siz[1]/6.0), sticky=True)
         #triangle = PolygonTexture(frame=b, vertices=((0,1),(1,1),(0.5,0)), color=(0,0,0,0.5))
+        self.pose_ix = 0
+        self.pose_step = 1
 
     #############################################################
 
@@ -102,15 +104,19 @@ class BciApplication(BciGenericApplication):
     #############################################################
 
     def Process(self, sig):
-        pass# process the new signal packet
+        pass
 
     #############################################################
 
     def Frame(self, phase):
         # update stimulus parameters if they need to be animated on a frame-by-frame basis
         intensity = 0.5 + 0.5 * numpy.sin(2.0 * numpy.pi * 0.5 * self.since('run')['msec']/1000.0)
-        self.screen.bgcolor = intensity * self.color
-        #self.stimuli['hand'].node.yaw(0.02)
+        #self.screen.bgcolor = intensity * self.color
+        #self.stimuli['hand'].node.pitch(0.02)
+        if self.pose_ix==100: self.pose_step = -1
+        elif self.pose_ix==0: self.pose_step = 1
+        self.pose_ix = self.pose_ix + self.pose_step
+        self.stimuli['hand'].setPose(self.pose_ix)# process the new signal packet
 
     #############################################################
 

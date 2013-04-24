@@ -1,12 +1,10 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
-#TODO: Fix box and sphere initial loading with wrong size.
 #TODO: Window placement
 #TODO: Text alternate coordinate frames
-#TODO: PolygonTexture
+#TODO: PolygonTexture->ImageStimulus
 #TODO: Keyboard events passed to application
 #TODO: Framerate
 #TODO: Fonts
-#TODO: Why is right -x?
 
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
@@ -66,7 +64,6 @@ class OgreRenderer(BciGenericRenderer):
     def defineResources(self):
         rgm = ogre.ResourceGroupManager.getSingleton()
         cf = ogre.ConfigFile()
-        print self.resource_path
         cf.load(self.resource_path)
         seci = cf.getSectionIterator()
         while seci.hasMoreElements():
@@ -112,14 +109,14 @@ class OgreRenderer(BciGenericRenderer):
         #Place the camera as far from the 0 plane as the larger of the screen size
         scrw,scrh = self.size
         longd = max(scrw,scrh)
-        self.camera.setPosition( ogre.Vector3(0, 0, -longd) )
+        self.camera.setPosition( ogre.Vector3(0, 0, longd) )
         self.camera.lookAt( ogre.Vector3(0, 0, 0) )
         self.camera.setNearClipDistance(round(longd/10))
 
         #Add a light source
         self.light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        self.light.setPosition ( ogre.Vector3(-scrw, scrh, -longd/5.0) )
+        self.light.setPosition ( ogre.Vector3(scrw, scrh, longd/5.0) )
         self.light.diffuseColour = 0.5, 0.5, 0.5
         self.light.specularColour = 0.3, 0.3, 0.3
 
@@ -191,17 +188,17 @@ class OgreRenderer(BciGenericRenderer):
         scrw,scrh = self.size
         longd = max((scrw,scrh))
         if cm == 'pixelsfromlowerleft': #VisionEgg default
-            self.camera.setPosition( ogre.Vector3(-scrw/2, scrh/2, zpos) )
+            self.camera.setPosition( ogre.Vector3(scrw/2, scrh/2, zpos) )
             #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
-            self.light.setPosition ( ogre.Vector3(-scrw, scrh, -longd) )
+            self.light.setPosition ( ogre.Vector3(scrw, scrh, longd) )
         elif cm == 'pixelsfromupperleft': #PygameRenderer default
-            self.camera.setPosition( ogre.Vector3(-scrw/2, -scrh/2, zpos) )
+            self.camera.setPosition( ogre.Vector3(scrw/2, -scrh/2, zpos) )
             #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
-            self.light.setPosition ( ogre.Vector3(-scrw, -scrh, -longd) )
+            self.light.setPosition ( ogre.Vector3(scrw, -scrh, longd) )
         elif cm == 'pixelsfromcenter': #OgreRenderer default
             self.camera.setPosition( ogre.Vector3(0, 0, zpos) )
             #self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
-            self.light.setPosition ( ogre.Vector3(-scrw/2, scrh/2, -longd/5.0) )
+            self.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
         else:
             raise ValueError('coordinate_mapping "%s" is unsupported' % value)
         self.__coordinate_mapping = value
@@ -229,6 +226,8 @@ class EntityStimulus(Coords.Box):
         #Set desired anchor, position, and size then reset
         super(EntityStimulus, self.__class__).anchor.fset(self, anchor)
         super(EntityStimulus, self.__class__).position.fset(self, position)
+        orig_size = self.entity.getBoundingBox().getSize()
+        self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
         self.sticky = sticky#This doesn't affect anything so we can use the direct access
         self.size = size#This will cause the reset
         self.color = color
@@ -244,25 +243,27 @@ class EntityStimulus(Coords.Box):
         desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
         desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
         #Scale
-        self.node.setScale(desiredSize[0],desiredSize[1],desiredSize[2])
+        origSize = self.__original_size
+        desiredScale = desiredSize/origSize
+        self.node.setScale(desiredScale[0],desiredScale[1],desiredScale[2])
         #Position
         anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
         desiredNodePos = desiredAnchPos - anch*desiredSize/2#Unadjust the anchor position to get node position
-        self.node.setPosition(-desiredNodePos[0],desiredNodePos[1],desiredNodePos[2])
+        self.node.setPosition(desiredNodePos[0],desiredNodePos[1],desiredNodePos[2])
 
     @property
     def size(self):
-        wbox = self.entity.getWorldBoundingBox()
-        trueSize = wbox.getSize()
+        trueSize = self.entity.getWorldBoundingBox().getSize()
         trueSize = (trueSize[0], trueSize[1], trueSize[2])#Convert from Ogre to tuple
-        #trueSize = [ts if ts else 1.0 for ts in trueSize]#Replace 0's with 1's on recently instantiated objects
+        if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
+            trueSize = self.__original_size
         super(EntityStimulus, self.__class__).size.fset(self, trueSize)
         return super(EntityStimulus, self).size
     @size.setter
     def size(self, value):
         value = tuple(value)
         while len(value)<3: value = value + (None,) #Fill out til it's 3D
-        value = tuple([x if x and x!=0 else 1.0 for x in value])#Replace 0/None's with 1's
+        value = tuple([x if x else 1.0 for x in value])#Replace None's with 1's
         super(EntityStimulus, self.__class__).size.fset(self, value)
         self.reset()
     @property
@@ -291,7 +292,7 @@ class EntityStimulus(Coords.Box):
     @property
     def position(self):
         nodePos = self.node.getPosition() #Get the true position
-        nodePos = Coords.Point([-nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
+        nodePos = Coords.Point([nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
         anchorPos = nodePos+self.anchor*self.size/2 #Adjust for the anchor
         super(EntityStimulus, self.__class__).position.fset(self, anchorPos) #Save internally
         return super(EntityStimulus, self).position
@@ -361,8 +362,8 @@ class EntityStimulus(Coords.Box):
         self.__color = value
 
     def makeMaterialUnique(self, entity):
-        nsubs = entity.getNumSubEntities()
         matMgr = ogre.MaterialManager.getSingleton()
+        nsubs = entity.getNumSubEntities()
         for se_ix in range(nsubs):
             se = entity.getSubEntity(se_ix)
             matName = se.getMaterialName()
@@ -372,8 +373,8 @@ class EntityStimulus(Coords.Box):
                 newmat = matMgr.getByName(uqname)
             else:
                 newmat = mat.clone(uqname)
-                #The only reason we'd use this function is to change
-                #the material's color/alpha, so let's enable that
+                #The only reason we'd use this function is to later change
+                #the material's color/alpha, so let's enable that functionality
                 newmat.setDepthWriteEnabled(False)
                 newmat.setSceneBlending(ogre.SceneBlendType.SBT_TRANSPARENT_ALPHA)
             se.setMaterial(newmat)
@@ -383,14 +384,14 @@ class HandStimulus(EntityStimulus):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         self.scale(80.0)
         import math
-        self.node.roll(-1.1*math.pi/2)
-        self.node.pitch(-1.1*math.pi/2)
+        self.node.roll(-80*math.pi/180)
+        self.node.pitch(60*math.pi/180)
         self.importPoses(n_poses)
         self.setPose(0)
 
     def importPoses(self, n_poses=100):
         import json
-        pfile = open('media/libhand/poses/stop_it.json')
+        pfile = open('media/libhand/poses/extended.json')
         extended_rot = json.load(pfile)
         extended_rot = extended_rot["hand_joints"]
         pfile.close()
@@ -445,9 +446,9 @@ class PrefabStimulus(EntityStimulus):
 class Disc(PrefabStimulus):
     """ Class to create a 3D Sphere."""
     def __init__(self, radius=10, **kwargs):
-        #kwargs['size'] = (2*radius,2*radius,2*radius)
+        kwargs['size'] = (2*radius,2*radius,2*radius)
         PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
-        self.radius = radius
+        #Default size is 100,100,100
 
     @property
     def radius(self):
@@ -461,11 +462,9 @@ class Block(PrefabStimulus):
     """
     Class to create a 3D cube.
     """
-    #From Meters: rectobj = VisualStimuli.Block(position=barpos, anchor=baranchor, on=True, size=(1,1), color=color)
-    def __init__(self, size=(10,10,10), **kwargs):
-        #kwargs['size'] = (1,1,1) #Will init with default size of 102,102,102
+    def __init__(self, **kwargs):
         PrefabStimulus.__init__(self, pttype="cube", **kwargs)
-        self.size = size
+        #default size is 102,102,102
 
 class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
