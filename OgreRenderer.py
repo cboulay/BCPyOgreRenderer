@@ -1,47 +1,62 @@
 #Based on http://wiki.python-ogre.org/index.php/CodeSnippets_Minimal_Application
-#TODO: Window placement
 #TODO: Text alternate coordinate frames
 #TODO: PolygonTexture->ImageStimulus
 #TODO: Keyboard events passed to application
-#TODO: Framerate
 #TODO: Fonts
+#TODO: Window placement. Removing the border causes unexpected placement
 
 __all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
 
-#import os
-#import sys
+import sys
+import os
+import os.path
 import time
-#import numpy
 import ogre.renderer.OGRE as ogre
-
+import ogre.io.OIS as OIS
 import BCPy2000.AppTools.Coords as Coords
 try:    from BCI2000PythonApplication    import BciGenericRenderer, BciStimulus   # development copy
 except: from BCPy2000.GenericApplication import BciGenericRenderer, BciStimulus   # installed copy
 
 class OgreRenderer(BciGenericRenderer):
-
+    debugText=""
     def __init__(self):
-        #Set some defaults
-        self._coords = Coords.Box(left=100, top=100, width=800, height=600, sticky=True, anchor='top left')
-        self._bgcolor = (0.5, 0.5, 0.5)
-        self.framerate = 60.
-        self.changemode = False
-        self.frameless_window = False
-        self.always_on_top = False
-        self.title = 'stimuli'
+        #Set some defaults that aren't defined by setup (i.e. non-parameterizable constants)
+        self.framerate = 60.#Checking the framerate is too slow.
         self.screen = None
         self._bci = None
+        self._bci_stepping = True
 
-    def setup(self, left = None, top = None, width = None, height = None,
-            bgcolor = None, framerate = None, changemode = None,
-            frameless_window = None, always_on_top = None, title=None,
+    def __del__(self):
+        "Clear variables, this should not actually be needed."
+        del self.camera
+        del self.sceneManager
+        del self.frameListener
+        #if self.world:
+            #del self.world
+        del self.root
+        del self.renderWindow
+
+    def setup(self, width = 800, height = 600, left = 0, top = 0,
+            bgcolor = (0.5, 0.5, 0.5), frameless_window = None, title="BCPyOgre",
             plugins_path = '.\\BCPyOgreRenderer\\plugins.cfg.nt', resource_path = '.\\BCPyOgreRenderer\\resources.cfg',
-            coordinate_mapping = 'pixels from center', **kwds):
-        #Set any constants that may come from the parameters.
-        #Called during application preflight on the main thread
-        self.plugins_path = plugins_path
-        self.resource_path = resource_path
-        self.__coordinate_mapping = coordinate_mapping
+            coordinate_mapping = 'pixels from center', id=None, scale=None, **kwds):
+        """BCI2000 parameters relevant to the display are passed in here,
+        durin gthe Application Preflight, either directly or through AppTools.Displays.fullscreen
+        """
+        self._coords = Coords.Box(left=left, top=top, width=width, height=height, sticky=True, anchor='top left')
+        self._bgcolor = bgcolor
+        self._plugins_path = plugins_path
+        self._resource_path = resource_path
+        self._coordinate_mapping = coordinate_mapping
+        self._screen_id = id #Might be None. This might be -1, so we need to find out how many monitors we have after ogre is initialized
+        self._screen_scale = scale #Might be None. This may overwrite width and height below after ogre is initialized
+        self._screen_params = {
+                                "title": title,
+                                "border": "none" if frameless_window else "fixed",#"none","fixed","resize"
+                                "left": left,
+                                "top": top,
+                                "monitorIndex": self._screen_id
+                                }
 
     def Initialize(self, bci=None):
         #Called after generic preflights, after generic _Initialize, but before application Initialize
@@ -53,18 +68,19 @@ class OgreRenderer(BciGenericRenderer):
         self.createRenderWindow()
         self.initializeResourceGroups()
         self.setupScene()
-        #self.createFrameListener()
+        self.createFrameListener()
         #self.setupInputSystem()
+        #self.startRenderLoop()
 
     # The Root constructor for the ogre
     def createRoot(self):
-        self.root = ogre.Root(self.plugins_path)
+        self.root = ogre.Root(self._plugins_path)
 
     # Here the resources are read from the resources.cfg
     def defineResources(self):
         rgm = ogre.ResourceGroupManager.getSingleton()
         cf = ogre.ConfigFile()
-        cf.load(self.resource_path)
+        cf.load(self._resource_path)
         seci = cf.getSectionIterator()
         while seci.hasMoreElements():
             secName = seci.peekNextKey()
@@ -81,8 +97,27 @@ class OgreRenderer(BciGenericRenderer):
 
     # Create the render window
     def createRenderWindow(self):
-        self.root.initialise(True, self.title)
-        self.renderWindow = self.root.getAutoCreatedWindow()
+        #self.root.initialise(True, self._screen_params["title"])
+        #self.renderWindow = self.root.getAutoCreatedWindow()
+        self.root.initialise(False)
+        hWnd = 0  # Get the hWnd of the application!
+        misc = ogre.NameValuePairList()
+        misc["externalWindowHandle"] = str(int(hWnd))
+        if self._screen_params["monitorIndex"] == -1:
+            try:
+                self._screen_params["monitorIndex"] = self.root.getDisplayMonitorCount()-1 #Only newer versions of Ogre
+            except:
+                import BCPy2000.AppTools.Displays as Displays
+                self._screen_params["monitorIndex"] = len(Displays.monitors())-1
+        #misc["border"] = self._screen_params["border"]
+        misc["left"] = str(int(self._screen_params["left"]))
+        misc["top"] = str(int(self._screen_params["top"]))
+        #misc["monitorIndex"] = str(int(self._screen_params["monitorIndex"]))#Doesn't seem to work :(
+        if self._screen_scale:
+            pass
+            #TODO: Get the size of the monitor and scale if a scale is provided
+        scrw,scrh = int(self._coords.width), int(self._coords.height)
+        self.renderWindow = self.root.createRenderWindow(self._screen_params["title"], scrw, scrh, False, misc)
         self.renderWindow.setDeactivateOnFocusChange(False)
 
     # Initialize the resources here (which were read from resources.cfg in defineResources()
@@ -103,7 +138,7 @@ class OgreRenderer(BciGenericRenderer):
         self.camera = self.sceneManager.createCamera("Camera")
 
         #Create and configure the viewPort
-        self.viewPort = self.root.getAutoCreatedWindow().addViewport(self.camera)
+        self.viewPort = self.renderWindow.addViewport(self.camera)
         self.viewPort.setBackgroundColour(self._bgcolor)
 
         #Place the camera as far from the 0 plane as the larger of the screen size
@@ -112,6 +147,7 @@ class OgreRenderer(BciGenericRenderer):
         self.camera.setPosition( ogre.Vector3(0, 0, longd) )
         self.camera.lookAt( ogre.Vector3(0, 0, 0) )
         self.camera.setNearClipDistance(round(longd/10))
+        self.camera.setAutoAspectRatio(True);
 
         #Add a light source
         self.light = self.sceneManager.createLight("Light1")
@@ -120,10 +156,35 @@ class OgreRenderer(BciGenericRenderer):
         self.light.diffuseColour = 0.5, 0.5, 0.5
         self.light.specularColour = 0.3, 0.3, 0.3
 
-        self.coordinate_mapping = self.__coordinate_mapping
+        self.coordinate_mapping = self._coordinate_mapping
+
+    def createFrameListener(self):
+        """Creates the FrameListener."""
+        #,self.frameListener, self.frameListener.Mouse
+        self.frameListener = FrameListener(self.renderWindow, self.camera)
+        #self.frameListener.unittest = self.unittest
+        self.frameListener.showDebugOverlay(True)
+        self.root.addFrameListener(self.frameListener)
+
+    def startRenderLoop(self):
+        self.root.startRendering()
+
+#===============================================================================
+#    def cleanUp(self):
+#        # Clean up CEGUI
+#        print "CLEANING"
+#        #del self.renderer
+#        del self.system
+#
+#        # Clean up Ogre
+#        #del self.exitListener
+#        del self.root
+#===============================================================================
 
     def GetFrameRate(self):
-        return self.framerate#self.renderWindow.getLastFPS()
+        if 'FramesPerSecond' in self._bci.estimated:
+            return self._bci.estimated['FramesPerSecond']['running']#self.renderWindow.getLastFPS() is too slow to do every frame.
+        else: return self.framerate
 
     def RaiseWindow(self):
         try:
@@ -146,9 +207,11 @@ class OgreRenderer(BciGenericRenderer):
         #Called on every visual display iteration
         #objlist is the list of stimuli
         #for obj in objlist: obj.updatePos()
-        ogre.WindowEventUtilities().messagePump()
-        self.root.renderOneFrame()
-        time.sleep(.0001)
+        if self._bci_stepping:
+            ogre.WindowEventUtilities().messagePump()
+            if not self.root.renderOneFrame():
+               raise NotImplementedError,"TODO: Use a better error to indicate rendering failed."
+            time.sleep(.0001)
 
     def FinishFrame(self):
         pass
@@ -180,7 +243,7 @@ class OgreRenderer(BciGenericRenderer):
 
     @property
     def coordinate_mapping(self):
-        return self.__coordinate_mapping
+        return self._coordinate_mapping
     @coordinate_mapping.setter
     def coordinate_mapping(self, value):
         zpos = self.camera.getPosition()[2]
@@ -201,7 +264,7 @@ class OgreRenderer(BciGenericRenderer):
             self.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
         else:
             raise ValueError('coordinate_mapping "%s" is unsupported' % value)
-        self.__coordinate_mapping = value
+        self._coordinate_mapping = value
 
     def Cleanup(self):
         #del self.eventListener
@@ -725,3 +788,377 @@ class Text(object):
     def on(self, value):
         if value: self.overlay.show()
         else: self.overlay.hide()
+
+class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
+    """A default frame listener, which takes care of basic mouse and keyboard
+    input."""
+
+    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False):
+        ogre.FrameListener.__init__(self)
+        ogre.WindowEventListener.__init__(self)
+        self.camera = camera
+        self.renderWindow = renderWindow
+        self.statisticsOn = True
+        self.numScreenShots = 0
+        self.timeUntilNextToggle = 0
+        self.sceneDetailIndex = 0
+        self.moveScale = 0.0
+        self.rotationScale = 0.0
+        self.translateVector = ogre.Vector3(0.0,0.0,0.0)
+        self.filtering = ogre.TFO_BILINEAR
+        self.showDebugOverlay(True)
+        self.rotateSpeed =  ogre.Degree(36)
+        self.moveSpeed = 100.0
+        self.rotationSpeed = 8.0
+        self.displayCameraDetails = False
+        self.bufferedKeys = bufferedKeys
+        self.bufferedMouse = bufferedMouse
+        self.rotationX = ogre.Degree(0.0)
+        self.rotationY = ogre.Degree(0.0)
+        self.bufferedJoy = bufferedJoy
+        self.shouldQuit = False # set to True to exit..
+        self.MenuMode = False   # lets understand a simple menu function
+
+        self.unittest = isUnitTest()
+        self.unittest_duration = UnitTest_Duration()  # seconds before screen shot a exit
+#         self.unittest_screenshot = sys.modules['__main__'].__file__.split('.')[0]     # file name for unittest screenshot
+        self.unittest_screenshot = UnitTest_Screenshot()
+        ## we can tell if we are using OgreRefapp based upon the camera class
+
+        if self.camera.__class__ == ogre.Camera:
+            self.RefAppEnable = False
+        else:
+            self.RefAppEnable = True
+        self._setupInput()
+
+    def __del__ (self ):
+      ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
+      self.windowClosed(self.renderWindow)
+
+    def _inputSystemParameters (self ):
+        """ ovreride to extend any OIS system parameters
+        """
+        return []
+
+    def _setupInput(self):
+         # ignore buffered input
+
+         # FIXME: This should be fixed in C++ propbably
+         import platform
+         int64 = False
+         for bit in platform.architecture():
+             if '64' in bit:
+                 int64 = True
+         if int64:
+             windowHnd = self.renderWindow.getCustomAttributeUnsignedLong("WINDOW")
+         else:
+             windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
+
+         #
+         # Here is where we create the OIS input system using a helper function that takes python list of tuples
+         #
+         t= self._inputSystemParameters()
+         params = [("WINDOW",str(windowHnd))]
+         params.extend(t)
+         self.InputManager = OIS.createPythonInputSystem( params )
+
+         #
+         # an alternate way is to use a multimap which is exposed in ogre
+         #
+#          pl = ogre.SettingsMultiMap()
+#          windowHndStr = str(windowHnd)
+#          pl.insert("WINDOW", windowHndStr)
+#          for  v in self._inputSystemParameters():
+#               pl.insert(v[0],v[1])
+#          im = OIS.InputManager.createInputSystem( pl )
+
+         #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
+         self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
+         self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
+         try:
+            self.Joy = self.InputManager.createInputObjectJoyStick( OIS.OISJoyStick, self.bufferedJoy )
+         except:
+            self.Joy = False
+#
+         #Set initial mouse clipping size
+         self.windowResized(self.renderWindow)
+
+         self.showDebugOverlay(True)
+
+         #Register as a Window listener
+         ogre.WindowEventUtilities.addWindowEventListener(self.renderWindow, self);
+
+
+
+    def setMenuMode(self, mode):
+        self.MenuMode = mode
+
+    def _UpdateSimulation( self, frameEvent ):
+        # create a real version of this to update the simulation
+        pass
+
+    def windowResized (self, rw):
+         dummyint = 0
+         width, height, depth, left, top= rw.getMetrics(dummyint,dummyint,dummyint, dummyint, dummyint)  # Note the wrapped function as default needs unsigned int's
+         ms = self.Mouse.getMouseState()
+         ms.width = width
+         ms.height = height
+
+    def windowClosed(self, rw):
+      #Only close for window that created OIS (mWindow)
+      if( rw == self.renderWindow ):
+         if( self.InputManager ):
+            self.InputManager.destroyInputObjectMouse( self.Mouse )
+            self.InputManager.destroyInputObjectKeyboard( self.Keyboard )
+            if self.Joy:
+                self.InputManager.destroyInputObjectJoyStick( self.Joy )
+            OIS.InputManager.destroyInputSystem(self.InputManager)
+            self.InputManager=None
+
+    ## NOTE the in Ogre 1.6 (1.7) this is changed to frameRenderingQueued !!!
+    def frameRenderingQueued ( self, evt ):
+        if(self.renderWindow.isClosed() or self.shouldQuit ):
+            return False
+        if self.unittest:
+            self.unittest_duration -= evt.timeSinceLastFrame
+            if self.unittest_duration < 0:
+                self.renderWindow.writeContentsToFile(self.unittest_screenshot + '.jpg')
+                return False
+        ##Need to capture/update each device - this will also trigger any listeners
+        self.Keyboard.capture()
+        self.Mouse.capture()
+        buffJ = True
+        if( self.Joy ):
+            self.Joy.capture()
+            buffJ = self.Joy.buffered()
+
+        ##Check if one of the devices is not buffered
+        if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ :
+            ## one of the input modes is immediate, so setup what is needed for immediate movement
+            if self.timeUntilNextToggle >= 0:
+                self.timeUntilNextToggle -= evt.timeSinceLastFrame
+
+            ## Move about 100 units per second
+            self.moveScale = self.moveSpeed * evt.timeSinceLastFrame
+            ## Take about 10 seconds for full rotation
+            self.rotScale = self.rotateSpeed * evt.timeSinceLastFrame
+
+        self.rotationX = ogre.Degree(0.0)
+        self.rotationY = ogre.Degree(0.0)
+        self.translateVector = ogre.Vector3().ZERO
+
+        ##Check to see which device is not buffered, and handle it
+        if not self.Keyboard.buffered():
+            if  not self._processUnbufferedKeyInput(evt):
+                return False
+        if not self.Mouse.buffered():
+            if not self._processUnbufferedMouseInput(evt):
+                return False
+
+        if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ:
+            self._moveCamera()
+        return True
+
+
+#     def frameStarted(self, frameEvent):
+#         return True
+#
+#         if self.timeUntilNextToggle >= 0:
+#             self.timeUntilNextToggle -= frameEvent.timeSinceLastFrame
+#
+#         if frameEvent.timeSinceLastFrame == 0:
+#             self.moveScale = 1
+#             self.rotationScale = 0.1
+#         else:
+#             self.moveScale = self.moveSpeed * frameEvent.timeSinceLastFrame
+#             self.rotationScale = self.rotationSpeed * frameEvent.timeSinceLastFrame
+#
+#         self.rotationX = ogre.Degree(0.0)
+#         self.rotationY = ogre.Degree(0.0)
+#         self.translateVector = ogre.Vector3(0.0, 0.0, 0.0)
+#         if not self._processUnbufferedKeyInput(frameEvent):
+#             return False
+#
+#         if not self.MenuMode:   # if we are in Menu mode we don't move the camera..
+#             self._processUnbufferedMouseInput(frameEvent)
+#         self._moveCamera()
+#         # Perform simulation step only if using OgreRefApp.  For simplicity create a function that simply does
+#         ###  "OgreRefApp.World.getSingleton().simulationStep(frameEvent.timeSinceLastFrame)"
+#
+#         if  self.RefAppEnable:
+#             self._UpdateSimulation( frameEvent )
+#         return True
+
+    def frameEnded(self, frameEvent):
+        if self.statisticsOn:
+            self._updateStatistics()
+        return True
+
+    def showDebugOverlay(self, show):
+        """Turns the debug overlay (frame statistics) on or off."""
+        overlay = ogre.OverlayManager.getSingleton().getByName('POCore/DebugOverlay')
+        if overlay is None:
+            self.statisticsOn = False
+            ogre.LogManager.getSingleton().logMessage( "ERROR in sf_OIS.py: Could not find overlay POCore/DebugOverlay" )
+            return
+        if show:
+            overlay.show()
+        else:
+            overlay.hide()
+
+    def _processUnbufferedKeyInput(self, frameEvent):
+        if self.Keyboard.isKeyDown(OIS.KC_A):
+            self.translateVector.x = -self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_D):
+            self.translateVector.x = self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_UP) or self.Keyboard.isKeyDown(OIS.KC_W):
+            self.translateVector.z = -self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_DOWN) or self.Keyboard.isKeyDown(OIS.KC_S):
+            self.translateVector.z = self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_PGUP):
+            self.translateVector.y = self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_PGDOWN):
+            self.translateVector.y = - self.moveScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_RIGHT):
+            self.rotationX = - self.rotationScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_LEFT):
+            self.rotationX = self.rotationScale
+
+        if self.Keyboard.isKeyDown(OIS.KC_ESCAPE) or self.Keyboard.isKeyDown(OIS.KC_Q):
+            return False
+
+        if( self.Keyboard.isKeyDown(OIS.KC_F) and self.timeUntilNextToggle <= 0 ):
+             self.statisticsOn = not self.statisticsOn
+             self.showDebugOverlay(self.statisticsOn)
+             self.timeUntilNextToggle = 1
+
+        if self.Keyboard.isKeyDown(OIS.KC_T) and self.timeUntilNextToggle <= 0:
+            if self.filtering == ogre.TFO_BILINEAR:
+                self.filtering = ogre.TFO_TRILINEAR
+                self.Aniso = 1
+            elif self.filtering == ogre.TFO_TRILINEAR:
+                self.filtering = ogre.TFO_ANISOTROPIC
+                self.Aniso = 8
+            else:
+                self.filtering = ogre.TFO_BILINEAR
+                self.Aniso = 1
+
+            ogre.MaterialManager.getSingleton().setDefaultTextureFiltering(self.filtering)
+            ogre.MaterialManager.getSingleton().setDefaultAnisotropy(self.Aniso)
+            self.showDebugOverlay(self.statisticsOn)
+            self.timeUntilNextToggle = 1
+
+        if self.Keyboard.isKeyDown(OIS.KC_SYSRQ) and self.timeUntilNextToggle <= 0:
+            path = 'screenshot_%d.png' % self.numScreenShots
+            self.numScreenShots += 1
+            self.renderWindow.writeContentsToFile(path)
+            Application.debugText = 'screenshot taken: ' + path
+            self.timeUntilNextToggle = 0.5
+
+        if self.Keyboard.isKeyDown(OIS.KC_R) and self.timeUntilNextToggle <= 0:
+            detailsLevel = [ ogre.PM_SOLID,
+                             ogre.PM_WIREFRAME,
+                             ogre.PM_POINTS ]
+            self.sceneDetailIndex = (self.sceneDetailIndex + 1) % len(detailsLevel)
+            self.camera.polygonMode=detailsLevel[self.sceneDetailIndex]
+            self.timeUntilNextToggle = 0.5
+
+        if self.Keyboard.isKeyDown(OIS.KC_F) and self.timeUntilNextToggle <= 0:
+            self.statisticsOn = not self.statisticsOn
+            self.showDebugOverlay(self.statisticsOn)
+            self.timeUntilNextToggle = 1
+
+        if self.Keyboard.isKeyDown(OIS.KC_P) and self.timeUntilNextToggle <= 0:
+            self.displayCameraDetails = not self.displayCameraDetails
+            if not self.displayCameraDetails:
+                Application.debugText = ""
+
+        if self.displayCameraDetails:
+            # Print camera details
+            pos = self.camera.getDerivedPosition()
+            o = self.camera.getDerivedOrientation()
+            Application.debugText = "P: %.3f %.3f %.3f O: %.3f %.3f %.3f %.3f"  \
+                        % (pos.x,pos.y,pos.z, o.w,o.x,o.y,o.z)
+        return True
+
+    def _isToggleKeyDown(self, keyCode, toggleTime = 1.0):
+        if self.Keyboard.isKeyDown(keyCode)and self.timeUntilNextToggle <=0:
+            self.timeUntilNextToggle = toggleTime
+            return True
+        return False
+
+    def _isToggleMouseDown(self, Button, toggleTime = 1.0):
+        ms = self.Mouse.getMouseState()
+        if ms.buttonDown( Button ) and self.timeUntilNextToggle <=0:
+            self.timeUntilNextToggle = toggleTime
+            return True
+        return False
+
+    def _processUnbufferedMouseInput(self, frameEvent):
+        ms = self.Mouse.getMouseState()
+        if ms.buttonDown( OIS.MB_Right ):
+            self.translateVector.x += ms.X.rel * 0.13
+            self.translateVector.y -= ms.Y.rel * 0.13
+        else:
+            self.rotationX = ogre.Degree(- ms.X.rel * 0.13)
+            self.rotationY = ogre.Degree(- ms.Y.rel * 0.13)
+        return True
+
+    def _moveCamera(self):
+        self.camera.yaw(self.rotationX)
+        self.camera.pitch(self.rotationY)
+#         try:
+#             self.camera.translate(self.translateVector) # for using OgreRefApp
+#         except AttributeError:
+        self.camera.moveRelative(self.translateVector)
+
+    def _updateStatistics(self):
+        statistics = self.renderWindow
+        self._setGuiCaption('POCore/AverageFps', 'Avg FPS: %u' % statistics.getAverageFPS())
+        self._setGuiCaption('POCore/CurrFps', 'FPS: %u' % statistics.getLastFPS())
+#         self._setGuiCaption('POCore/BestFps',
+#                              'Best FPS: %f %d ms' % (statistics.getBestFPS(), statistics.getBestFrameTime()))
+#         self._setGuiCaption('POCore/WorstFps',
+#                              'Worst FPS: %f %d ms' % (statistics.getWorstFPS(), statistics.getWorstFrameTime()))
+        self._setGuiCaption('POCore/NumTris', 'Trianges: %u' % statistics.getTriangleCount())
+        self._setGuiCaption('POCore/NumBatches', 'Batches: %u' % statistics.batchCount)
+
+        self._setGuiCaption('POCore/DebugText', OgreRenderer.debugText)
+
+    def _setGuiCaption(self, elementName, text):
+        element = ogre.OverlayManager.getSingleton().getOverlayElement(elementName, False)
+        ##d=ogre.UTFString("hell0")
+        ##element.setCaption(d)
+
+        #element.caption="hello"
+
+        #element.setCaption("help")
+        element.setCaption(text) # ogre.UTFString(text))
+
+def isUnitTest():
+    """ use an environment variable to define that we need to do unittesting"""
+    env = os.environ
+    if env.has_key ("PythonOgreUnitTestPath"):
+        return True
+    return False
+
+def UnitTest_Duration():
+    return 5
+
+def UnitTest_Screenshot():
+    if isUnitTest():
+        env = os.environ
+        path = env["PythonOgreUnitTestPath"]
+        parentpath = os.getcwd().split(os.path.sep)[-1] # get the last part of the parent directory
+        filename = parentpath+'.'+ sys.modules['__main__'].__file__.split('.')[0] # file name is parent.demo.xx
+        path = os.path.join ( path, filename )
+        return path
+    else:
+        return "test"
