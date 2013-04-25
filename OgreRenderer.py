@@ -194,31 +194,192 @@ class OgreRenderer(BciGenericRenderer):
 
 BciGenericRenderer.subclass = OgreRenderer
 
-class EntityStimulus(Coords.Box):
-    """Creates a 3D Ogre object using provided mesh or entity.
-    """
-    def __init__(self, mesh_name='hand.mesh', entity=None, parent=None,
-                 size=(1,1,1), color=None, position=(0,0,0), anchor='center', on=True, sticky=False,
-                 **kwargs):
+class OgreStimulus(Coords.Box):
+    """Superclass for EntityStimulus and Text.
+    Contains a FEW common functions. DRY"""
+    def __init__(self, size=(1,1,1), color=None, position=(0,0,0), anchor='center', on=True, sticky=False, **kwargs):
         Coords.Box.__init__(self)
         self.ogr = ogre.Root.getSingleton()
-        self.sceneManager = self.ogr.getSceneManager("Default SceneManager")
-        self.entity = entity if entity else self.sceneManager.createEntity(mesh_name + 'Entity', mesh_name)
-        parent = parent if parent else self.sceneManager.getRootSceneNode()
-        self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
-        self.node.attachObject(self.entity)
-
         #Set desired anchor, position, and size then reset
-        super(EntityStimulus, self.__class__).anchor.fset(self, anchor)
-        super(EntityStimulus, self.__class__).position.fset(self, position)
-        orig_size = self.entity.getBoundingBox().getSize()
-        self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        super(OgreStimulus, self.__class__).anchor.fset(self, anchor)
+        super(OgreStimulus, self.__class__).position.fset(self, position)
         self.sticky = sticky#This doesn't affect anything so we can use the direct access
         self.size = size#This will cause the reset
         if color: self.color = color
         self.on = on
 
-    #size, width, height, depth
+    @property
+    def size(self):
+        #Subclass should overshadow this to get the real size from the object and set the internal size
+        return Coords.Box.size.fget(self)
+    @size.setter
+    def size(self, value):
+        value = tuple(value)
+        while len(value)<3: value = value + (None,) #Fill out til it's 3D
+        value = tuple([x if x else 1.0 for x in value])#Replace None's with 1's
+        super(OgreStimulus, self.__class__).size.fset(self, value)
+        self.reset()
+    @property
+    def width(self):
+        return self.size.x #Returns updated representation
+    @width.setter
+    def width(self, value):
+        super(OgreStimulus, self.__class__).width.fset(self, value)
+        self.reset()
+    @property
+    def height(self):
+        return self.size.y
+    @height.setter
+    def height(self, value):
+        super(OgreStimulus, self.__class__).height.fset(self, value)
+        self.reset()
+    @property
+    def depth(self):
+        return self.size.z
+    @depth.setter
+    def depth(self, value):
+        super(OgreStimulus, self.__class__).depth.fset(self, value)
+        self.reset()
+    def scale(self, value):
+        if not isinstance(value, (tuple,list)): value = tuple([value])
+        while len(value)<3: value = value + (value[-1], )
+        self.size = self.size * value
+
+    @property
+    def position(self):
+        #Subclass should overshadow this to get the real position and set the internal variable
+        return super(OgreStimulus, self).position
+    @position.setter
+    def position(self, value):
+        #Account for None in value
+        currAnchPos = self.position
+        newAnchPos = [new if new else old for new,old in zip(value,currAnchPos)]
+        super(OgreStimulus, self.__class__).position.fset(self, newAnchPos)
+        self.reset()
+    @property
+    def x(self):
+        return self.position.x #This updates __position with the true position.
+    @x.setter
+    def x(self, value):
+        super(OgreStimulus, self.__class__).x.fset(self, value)
+        self.reset()
+    @property
+    def y(self):
+        return self.position.y #This updates __position with the true position.
+    @y.setter
+    def y(self, value):
+        super(OgreStimulus, self.__class__).y.fset(self, value)
+        self.reset()
+    @property
+    def z(self):
+        return self.position.z #This updates __position with the true position.
+    @z.setter
+    def z(self, value):
+        super(OgreStimulus, self.__class__).z.fset(self, value)
+        self.reset()
+
+    #Others: lims,rect,left,right,top,bottom,near,far
+    @property
+    def lims(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).lims
+    @lims.setter
+    def lims(self, value):
+        super(OgreStimulus, self.__class__).lims.fset(self, value)
+        self.reset()
+    @property
+    def rect(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).rect
+    @rect.setter
+    def rect(self, value):
+        super(OgreStimulus, self.__class__).rect.fset(self, value)
+        self.reset()
+    @property
+    def left(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).left
+    @left.setter
+    def left(self, value):
+        super(OgreStimulus, self.__class__).left.fset(self, value)
+        self.reset()
+    @property
+    def right(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).right
+    @right.setter
+    def right(self, value):
+        super(OgreStimulus, self.__class__).right.fset(self, value)
+        self.reset()
+    @property
+    def top(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).top
+    @top.setter
+    def top(self, value):
+        super(OgreStimulus, self.__class__).top.fset(self, value)
+        self.reset()
+    @property
+    def bottom(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).bottom
+    @bottom.setter
+    def bottom(self, value):
+        super(OgreStimulus, self.__class__).bottom.fset(self, value)
+        self.reset()
+    @property
+    def near(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).near
+    @near.setter
+    def near(self, value):
+        super(OgreStimulus, self.__class__).near.fset(self, value)
+        self.reset()
+    @property
+    def far(self):
+        self.position
+        self.size
+        return super(OgreStimulus, self).far
+    @far.setter
+    def far(self, value):
+        super(OgreStimulus, self.__class__).far.fset(self, value)
+        self.reset()
+
+    @property
+    def anchor(self):
+        return super(OgreStimulus, self).anchor
+    @anchor.setter
+    def anchor(self, value):
+        super(OgreStimulus, self.__class__).anchor.fset(self, value)
+        self.reset()
+
+class EntityStimulus(OgreStimulus):
+    """Creates a 3D Ogre object using provided mesh or entity.
+    """
+    def __init__(self, mesh_name='hand.mesh', entity=None, parent=None, **kwargs):
+        #Coords.Box.__init__(self)
+        #self.ogr = ogre.Root.getSingleton()
+        #self.sceneManager = self.ogr.getSceneManager("Default SceneManager")
+        ogr = ogre.Root.getSingleton()
+        self.sceneManager = ogr.getSceneManager("Default SceneManager")
+
+        #Unique to this class
+        self.entity = entity if entity else self.sceneManager.createEntity(mesh_name + 'Entity', mesh_name)
+        parent = parent if parent else self.sceneManager.getRootSceneNode()
+        self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
+        self.node.attachObject(self.entity)
+        orig_size = self.entity.getBoundingBox().getSize()
+        self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        #Common settings
+        OgreStimulus.__init__(self, **kwargs)
+
     def reset(self):
         desiredSize = super(EntityStimulus, self).size
         anch = super(EntityStimulus, self).anchor
@@ -242,85 +403,22 @@ class EntityStimulus(Coords.Box):
         trueSize = (trueSize[0], trueSize[1], trueSize[2])#Convert from Ogre to tuple
         if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
             trueSize = self.__original_size
-        super(EntityStimulus, self.__class__).size.fset(self, trueSize)
+        Coords.Box.size.fset(self, trueSize)
         return super(EntityStimulus, self).size
     @size.setter
-    def size(self, value):
-        value = tuple(value)
-        while len(value)<3: value = value + (None,) #Fill out til it's 3D
-        value = tuple([x if x else 1.0 for x in value])#Replace None's with 1's
-        super(EntityStimulus, self.__class__).size.fset(self, value)
-        self.reset()
-    @property
-    def width(self):
-        return self.size.x #Returns updated representation
-    @width.setter
-    def width(self, value):
-        super(EntityStimulus, self.__class__).width.fset(self, value)
-        self.reset()
-    @property
-    def height(self):
-        return self.size.y
-    @height.setter
-    def height(self, value):
-        super(EntityStimulus, self.__class__).height.fset(self, value)
-        self.reset()
-    @property
-    def depth(self):
-        return self.size.z
-    @depth.setter
-    def depth(self, value):
-        super(EntityStimulus, self.__class__).depth.fset(self, value)
-        self.reset()
-    def scale(self, value):
-        if not isinstance(value, (tuple,list)): value = tuple([value])
-        while len(value)<3: value = value + (value[-1], )
-        self.size = self.size * value
+    def size(self,value):
+       super(EntityStimulus, self.__class__).size.fset(self, value)
 
-    #position, x, y, z
     @property
     def position(self):
         nodePos = self.node.getPosition() #Get the true position
         nodePos = Coords.Point([nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
         anchorPos = nodePos+self.anchor*self.size/2 #Adjust for the anchor
-        super(EntityStimulus, self.__class__).position.fset(self, anchorPos) #Save internally
+        Coords.Box.position.fset(self, anchorPos)
         return super(EntityStimulus, self).position
     @position.setter
-    def position(self, value):
-        #Account for None in value
-        currAnchPos = self.position
-        newAnchPos = [new if new else old for new,old in zip(value,currAnchPos)]
-        super(EntityStimulus, self.__class__).position.fset(self, newAnchPos)
-        self.reset()
-    @property
-    def x(self):
-        return self.position.x #This updates __position with the true position.
-    @x.setter
-    def x(self, value):
-        super(EntityStimulus, self.__class__).x.fset(self, value)
-        self.reset()
-    @property
-    def y(self):
-        return self.position.y #This updates __position with the true position.
-    @y.setter
-    def y(self, value):
-        super(EntityStimulus, self.__class__).y.fset(self, value)
-        self.reset()
-    @property
-    def z(self):
-        return self.position.z #This updates __position with the true position.
-    @z.setter
-    def z(self, value):
-        super(EntityStimulus, self.__class__).z.fset(self, value)
-        self.reset()
-
-    @property
-    def anchor(self):
-        return super(EntityStimulus, self).anchor
-    @anchor.setter
-    def anchor(self, value):
-        super(EntityStimulus, self.__class__).anchor.fset(self, value)
-        self.reset()
+    def position(self,value):
+        super(EntityStimulus, self.__class__).position.fset(self, value)
 
     @property
     def on(self):
@@ -458,6 +556,21 @@ class Block(PrefabStimulus):
         PrefabStimulus.__init__(self, pttype="cube", **kwargs)
         #default size is 102,102,102
 
+    @property
+    def testprop(self):
+        print "testprop getter"
+        return 0
+    @testprop.setter
+    def testprop(self):
+        print "testprop setter"
+
+    def get_getset(self):
+        print "getset getter"
+        return 0
+    def set_getset(self, value):
+        print "getset setter"
+    getset = property(get_getset, set_getset)
+
 class ImageStimulus(EntityStimulus):
     """Class for creating 2D-like stimuli.
     Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
@@ -557,10 +670,12 @@ class Movie(ImageStimulus):
     def __init__(self, filename, position=(100,100), size=None, **kwargs):
         pass
 
-class Text(object):
+class Text(OgreStimulus):
     """Docstring"""
     def __init__(self, text='Hello world', font_name="BlueHighway",\
-                  font_size=16, position=(10,10), color=(1, 1, 1), anchor='lower left', angle=0.0, on=True, smooth=True):
+                  font_size=16, angle=0.0, smooth=True, **kwargs):
+        #angle and smooth get eaten because I have no idea what they do
+
         #Create an overlay
         ovm = ogre.OverlayManager.getSingleton()
         ix = 0
@@ -569,111 +684,74 @@ class Text(object):
             ix += 1
             overlayname = 'Overlay_' + str(ix)
         overlay = ovm.create(overlayname)
-
         #Create a panel
         panel = ovm.createOverlayElement("Panel", 'Panel_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
         panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
-
         #Create a text area
         textArea = ovm.createOverlayElement("TextArea", 'TextArea_' + str(ix))
         textArea.setMetricsMode(ogre.GMM_PIXELS)
         textArea.setPosition(0, 0)
         textArea.setVerticalAlignment( ogre.GVA_TOP )
-
         #Put it together
         overlay.add2D(panel)#Add the panel to the overlay
         panel.addChild(textArea)#Add the text area to the panel
-
+        #Store the variables
         self.overlay = overlay
         self.panel = panel
         self.textArea = textArea
-
-        #Now update its properties based on input. User property setters where possible.
-        self.anchor = anchor
+        #Some settings
         self.text = text
-        #self.font_name = font_name #TODO: Fonts!
         self.font_name = "BlueHighway"
         self.font_size = font_size
-        self.color = color
-        self.size = (len(text)*font_size/(16.0/6),font_size)
-        self.position = position
-        self.on = on
+        #self.font_name = font_name #TODO: Fonts!
+        self.__original_size = Coords.Size((len(text)*font_size/(16.0/6),font_size,1.0))
+        #Common init steps: anchor, position, sticky, size, color, on
+        OgreStimulus.__init__(self, **kwargs)
 
-    def updatePos(self):
-        pass
-        #Placeholder until this subclasses OgreStimulus
-        #Then this will handle the transformation from internal position to onscreen (Ogre) position.
 
-    #Positional values for the panel
-    @property
-    def left(self):
-        return self.panel.getLeft()
-    @left.setter
-    def left(self, value):
-        self.panel.setLeft(value)
-    @property
-    def right(self):
-        return self.left + self.width
-    @right.setter
-    def right(self, value):
-        self.left = value - self.width
-    @property
-    def top(self):
-        return self.panel.getTop()
-    @top.setter
-    def top(self, value):
-        self.panel.setTop(value)
-    @property
-    def bottom(self):
-        return self.top + self.height
-    @bottom.setter
-    def bottom(self, value):
-        self.panel.setTop(value - self.height)
-    @property
-    def width(self):
-        return self.panel.getWidth()
-    @width.setter
-    def width(self, value):
-        self.panel.setWidth(value)
-    @property
-    def height(self):
-        return self.panel.getHeight()
-    @height.setter
-    def height(self, value):
-        self.panel.setHeight(value)
+    def reset(self):
+        desiredSize = super(Text, self).size
+        anch = self.anchor
+        desiredAnchPos = super(Text, self).position
+        #Account for negative sizes
+        negDim = [x<0 for x in desiredSize]
+        desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
+        desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
+        #Scale
+        origSize = self.__original_size
+        desiredScale = desiredSize/origSize
+        #Position
+        anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
+        panL = desiredAnchPos[0] - (anch[0]+1)*(desiredSize[0]/2)
+        panT = desiredAnchPos[1] - (1-anch[1])*(desiredSize[1]/2)
+        self.panel.setDimensions(desiredScale[0],desiredScale[1])
+        self.panel.setPosition(panL,panT)
+
     @property
     def size(self):
-        """Bounding panel size"""
-        return (self.width, self.height)
+        trueSize = (self.panel.getHeight(), self.panel.getWidth(), 0)
+        if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
+            trueSize = self.__original_size
+        Coords.Box.size.fset(self, trueSize)
+        return super(Text, self).size
     @size.setter
-    def size(self, value):
-        self.panel.setDimensions(*value)
+    def size(self,value):
+        super(Text, self.__class__).size.fset(self, value)
 
-    #positional values for the panel's anchor
     @property
     def position(self):
-        return Coords.Point([self.x, self.y])
+        t,l,w,h = self.panel.getTop(), self.panel.getLeft(), self.panel.getHeight(), self.panel.getWidth()
+        a = self.anchor
+        aX = l + (a[0]+1)*w/2
+        aY = t + (1-a[1])*h/2
+        Coords.Box.position.fset(self, (aX,aY,0))
+        return super(Text, self).position
     @position.setter
-    def position(self, value):
-        pos = Coords.Point(value)
-        self.x = pos.x
-        self.y = pos.y
-    @property
-    def x(self):
-        return self.right if self.anchor == 'right' else self.left
-    @x.setter
-    def x(self, value):
-        if self.anchor == 'right':
-            self.right = value
-        else:
-            self.left = value
-    @property
-    def y(self):
-        return self.top
-    @y.setter
-    def y(self, value):
-        self.top = value
+    def position(self,value):
+        value = tuple(value)
+        while len(value)<3: value = value + (None,)
+        super(Text, self.__class__).position.fset(self, value)
 
     @property
     def color(self):
