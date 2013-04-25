@@ -198,7 +198,7 @@ class EntityStimulus(Coords.Box):
     """Creates a 3D Ogre object using provided mesh or entity.
     """
     def __init__(self, mesh_name='hand.mesh', entity=None, parent=None,
-                 size=(1,1,1), color=(1,1,1,1), position=(0,0,0), anchor='center', on=True, sticky=False,
+                 size=(1,1,1), color=None, position=(0,0,0), anchor='center', on=True, sticky=False,
                  **kwargs):
         Coords.Box.__init__(self)
         self.ogr = ogre.Root.getSingleton()
@@ -215,7 +215,7 @@ class EntityStimulus(Coords.Box):
         self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
         self.sticky = sticky#This doesn't affect anything so we can use the direct access
         self.size = size#This will cause the reset
-        self.color = color
+        if color: self.color = color
         self.on = on
 
     #size, width, height, depth
