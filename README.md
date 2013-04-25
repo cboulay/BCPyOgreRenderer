@@ -67,7 +67,7 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
         1. `Object.__init__()` #Its super's init
         2. `self._threads = {}` #Empty list of threads
     2. `self.screen = None` #Placeholder
-    3. self._threads['visual display'] = BciThread(func=self._visual_display, loop=True)` #Messging capable thread is created but not run yet
+    3. self._threads['visual display'] = BciThread(func=self._visual_display, loop=True)` #Messaging capable thread is created but not run yet
     4. `self._optimize_display_thread_affinity = False`, `self._optimize_display_thread_priority = False`, `self._optimize_process_priority = False`, `self._display_sleep_msec = -1`
 
 #### _start stage. From (5) in the BCI2000 stage.
