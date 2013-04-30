@@ -1,4 +1,4 @@
-BCPyPandaRenderer
+BCPyOgreRenderer
 =================
 
 This is a drop-in replacement renderer for [BCPy2000](http://bci2000.org/downloads/BCPy2000/Renderers.html)
