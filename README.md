@@ -9,6 +9,7 @@ using the [OGRE3D](http://www.ogre3d.org/) engine with its [Python-Ogre](http://
 My [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) implementation of BCPy2000 requires Python 2.6.
 Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.6.4%20SnapShot/Python-Ogre-Core-1.6.4-r1017-py263.7z/download) compatible with Python 2.6.
 [Install instructions](http://www.cse.unr.edu/~sushil/class/381/ware/pythonOgreWin7Install.pdf).
+(If you already installed BCPy2000 then you can skip steps 1-3).
 
 Download this repo and put it somewhere convenient. Edit your plugins.cfg and resources.cfg file
 so they point to where your resources are stored. Edit test.bat to point to your BCI2000 files.
@@ -17,12 +18,13 @@ Run `test.bat` to try it out.
 
 ## Notes
 
-To maintain compatibility with other applications I've used the myApp.stimulus() convention. This wraps
-the stimulus objects in a BciStimulus object. e.g.:
+To maintain compatibility with other BCPy2000 applications I've used the myApp.stimulus() convention.
+This wraps the stimulus objects in a BciStimulus object. e.g.:
 
-`hand = myApp.stimuli['hand']`  `hand` is a BciStimulus object.
+`hand = myApp.stimuli['hand']`
 
-The BciStimulus object conveniently exposes the actual object's properties. e.g.:
+where `hand` is a BciStimulus object. The BciStimulus object conveniently exposes the actual object's properties. e.g.:
+
 `hand.x = 10` is equivalent to `hand.obj.x = 10`
 
 This is not true for `z`. i.e., `hand.z = 10` is not equivalent to `hand.obj.z = 10`. For a BciStimulus object,
