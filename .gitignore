@@ -2,6 +2,7 @@
 .project
 .pydevproject
 ogre.cfg
+Ogre.log
 *.log
 .settings
 org.eclipse.*
