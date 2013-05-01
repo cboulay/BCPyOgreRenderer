@@ -515,12 +515,12 @@ class HandStimulus(EntityStimulus):
     def setPose(self, pose_ix):
         skel = self.entity.getSkeleton()
         pose = self.poses[pose_ix]
-		self.__pose_ix = pose_ix
+        self.__pose_ix = pose_ix
         for key in pose: #key = "finger4joint2"
             bone = skel.getBone(key)
             bone.setOrientation(pose[key])
-	def getPose(self):
-		return self.__pose_ix
+    def getPose(self):
+        return self.__pose_ix
 
 class PrefabStimulus(EntityStimulus):
     def __init__(self, pttype="sphere", **kwargs):
