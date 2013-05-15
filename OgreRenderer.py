@@ -514,6 +514,7 @@ class HandStimulus(EntityStimulus):
 
     def setPose(self, pose_ix):
         skel = self.entity.getSkeleton()
+        pose_ix = int(pose_ix)
         pose = self.poses[pose_ix]
         self.__pose_ix = pose_ix
         for key in pose: #key = "finger4joint2"
