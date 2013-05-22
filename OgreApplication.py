@@ -228,6 +228,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         else:
             self.RefAppEnable = True
         self._setupInput()
+        self._registeredAnimStates = []
 
     def __del__ (self ):
       ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
@@ -355,6 +356,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
 
         if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ:
             self._moveCamera()
+
         return True
 
 
@@ -541,6 +543,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
 
         #element.setCaption("help")
         element.setCaption(text) # ogre.UTFString(text))
+
 
 if __name__ == '__main__':
     import threading

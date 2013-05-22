@@ -360,6 +360,20 @@ class OgreStimulus(Coords.Box):
         super(OgreStimulus, self.__class__).anchor.fset(self, value)
         self.reset()
 
+class EntityFrameListener(ogre.FrameListener):
+    def __init__(self, entity):
+        ogre.FrameListener.__init__(self)
+        self.entity = entity
+        self.animStates = self.entity.getAllAnimationStates()
+
+    def frameRenderingQueued ( self, evt ):
+        animIt = self.animStates.getAnimationStateIterator()
+        while animIt.hasMoreElements():
+            animState = animIt.getNext()
+            #animState.addTime(evt.timeSinceLastFrame)
+        
+        return True
+
 class EntityStimulus(OgreStimulus):
     """Creates a 3D Ogre object using provided mesh or entity.
     """
@@ -377,6 +391,9 @@ class EntityStimulus(OgreStimulus):
         self.node.attachObject(self.entity)
         orig_size = self.entity.getBoundingBox().getSize()
         self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        #Add a new frame listener to ogr for this stimulus' animations.
+        self.frameListener = EntityFrameListener(self.entity)
+        ogr.addFrameListener(self.frameListener)
         #Common settings
         OgreStimulus.__init__(self, **kwargs)
 
@@ -470,7 +487,7 @@ class HandStimulus(EntityStimulus):
     def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         #The Hand's bounding box is not indicative of its size.
-        self._EntityStimulus__original_size = Coords.Size((1.5189208984375, 1.2220458984375, 1.366025447845459))
+        #self._EntityStimulus__original_size = Coords.Size((1.5189208984375, 1.2220458984375, 1.366025447845459))
         #self.size = self._EntityStimulus__original_size * 80
         self.scale(80)
         import math
@@ -481,7 +498,7 @@ class HandStimulus(EntityStimulus):
 
     def importPoses(self, n_poses=100):
         import json
-        pfile = open('media/libhand/poses/extended.json')
+        pfile = open('BCPyOgreRenderer/media/libhand/poses/extended.json')
         extended_rot = json.load(pfile)
         extended_rot = extended_rot["hand_joints"]
         pfile.close()
