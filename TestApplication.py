@@ -1,6 +1,6 @@
 import math
 import numpy
-import OgreRenderer
+import BCPyOgreRenderer.OgreRenderer as OgreRenderer
 from AppTools.StateMonitors import addstatemonitor, addphasemonitor
 
 #################################################################
@@ -32,8 +32,7 @@ class BciApplication(BciGenericApplication):
     def Preflight(self, sigprops):
         # Here is where you would set VisionEgg.config parameters,
         # either using self.screen.setup(), or directly.
-        self.screen.setup(frameless_window=0, coordinate_mapping = 'pixels from lower left',
-                          plugins_path='plugins.cfg.nt', resource_path='resources.cfg')
+        self.screen.setup(frameless_window=0, coordinate_mapping = 'pixels from lower left')
 
     #############################################################
 

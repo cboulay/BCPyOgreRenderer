@@ -12,7 +12,7 @@ import sys
 import os
 import os.path
 import time
-import OgreApplication
+import OgreApplication #This is a typical python-ogre style application except it runs in a thread.
 import ogre.renderer.OGRE as ogre
 import BCPy2000.AppTools.Coords as Coords
 try:    from BCI2000PythonApplication    import BciGenericRenderer, BciStimulus   # development copy
@@ -76,7 +76,7 @@ class OgreRenderer(BciGenericRenderer):
 
     def setup(self, width = 800, height = 600, left = 0, top = 0,
             bgcolor = (0.5, 0.5, 0.5), frameless_window = None, title="BCPyOgre",
-            plugins_path = '.\\BCPyOgreRenderer\\plugins.cfg.nt', resource_path = '.\\BCPyOgreRenderer\\resources.cfg',
+            plugins_path = None, resource_path = None,
             coordinate_mapping = 'pixels from center', id=None, scale=None, **kwds):
         """BCI2000 parameters relevant to the display are passed in here,
         during the Application Preflight, either directly or through AppTools.Displays.fullscreen, on the main thread.

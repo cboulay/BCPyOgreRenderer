@@ -6,6 +6,6 @@ Reset system
 Startup system localhost
 Start executable SignalGenerator --local --FileFormat=Null
 Start executable DummySignalProcessing --local
-Start executable PythonApplication --local --PythonAppClassFile=..\..\BCPyElectrophys\BCPyOgreRenderer\TestApplication.py --PythonAppWD=..\..\BCPyElectrophys\BCPyOgreRenderer
+Start executable PythonApplication --local --PythonAppClassFile=..\..\BCPyElectrophys\BCPyOgreRenderer\TestApplication.py --PythonAppWD=..\..\BCPyElectrophys
 Wait for Connected
 #Load parameterfile "../../BCPyElectrophys/BCPyOgreRenderer/test.prm"

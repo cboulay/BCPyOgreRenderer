@@ -11,6 +11,7 @@ def getPluginPath():
     """
 
     paths = [os.path.join(os.getcwd(), 'plugins.cfg'),
+             os.path.join(os.getcwd(), 'BCPyOgreRenderer', 'plugins.cfg'),
              os.path.join(os.getcwd(), '..','plugins.cfg'),
              ]
     if os.sys.platform == 'darwin':
@@ -58,9 +59,9 @@ class Application(object):
     def fakeIt(self):
         """Set some self variables that would normally be set by the BCPy Renderer wrapper."""
         import BCPy2000.AppTools.Coords as Coords
+        self._plugins_path = None
+        self._resource_path = None
         self._coords = Coords.Box(left=0, top=0, width=800, height=600, sticky=True, anchor='top left')
-        self._plugins_path = getPluginPath()
-        self._resource_path = 'resources.cfg'
         self._screen_scale = 0.9
         self._screen_params = {
                                 "monitorIndex": 0,
@@ -70,6 +71,10 @@ class Application(object):
                                }
 
     def go(self):
+        if self._plugins_path is None:
+            self._plugins_path = getPluginPath()
+        if self._resource_path is None:
+            self._resource_path = os.path.join(os.path.dirname(self._plugins_path),'resources.cfg')
         self.createRoot()
         self.defineResources()
         self.setupRenderSystem()
