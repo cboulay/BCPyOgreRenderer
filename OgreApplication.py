@@ -71,10 +71,6 @@ class Application(object):
                                }
 
     def go(self):
-        if self._plugins_path is None:
-            self._plugins_path = getPluginPath()
-        if self._resource_path is None:
-            self._resource_path = os.path.join(os.path.dirname(self._plugins_path),'resources.cfg')
         self.createRoot()
         self.defineResources()
         self.setupRenderSystem()
@@ -88,6 +84,10 @@ class Application(object):
 
     # The Root constructor for the ogre
     def createRoot(self):
+        if self._plugins_path is None:
+            self._plugins_path = getPluginPath()
+        if self._resource_path is None:
+            self._resource_path = os.path.join(os.path.dirname(self._plugins_path),'resources.cfg')
         self.root = ogre.Root(self._plugins_path)
 
     # Here the resources are read from the resources.cfg
