@@ -497,8 +497,9 @@ class HandStimulus(EntityStimulus):
         self.setPose(0)
 
     def importPoses(self, n_poses=100):
-        import json
-        pfile = open('BCPyOgreRenderer/media/libhand/poses/extended.json')
+        import json, os
+        pfilename = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'media/libhand/poses/extended.json')
+        pfile = open(pfilename)
         extended_rot = json.load(pfile)
         extended_rot = extended_rot["hand_joints"]
         pfile.close()
@@ -532,6 +533,8 @@ class HandStimulus(EntityStimulus):
     def setPose(self, pose_ix):
         skel = self.entity.getSkeleton()
         pose_ix = int(pose_ix)
+        pose_ix = min(pose_ix, len(self.poses)-1)
+        pose_ix = max(pose_ix, 0)
         pose = self.poses[pose_ix]
         self.__pose_ix = pose_ix
         for key in pose: #key = "finger4joint2"
