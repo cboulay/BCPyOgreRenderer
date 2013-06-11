@@ -370,7 +370,7 @@ class EntityFrameListener(ogre.FrameListener):
         animIt = self.animStates.getAnimationStateIterator()
         while animIt.hasMoreElements():
             animState = animIt.getNext()
-            #animState.addTime(evt.timeSinceLastFrame)
+            animState.addTime(evt.timeSinceLastFrame)
         
         return True
 
@@ -391,9 +391,11 @@ class EntityStimulus(OgreStimulus):
         self.node.attachObject(self.entity)
         orig_size = self.entity.getBoundingBox().getSize()
         self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        
         #Add a new frame listener to ogr for this stimulus' animations.
-        self.frameListener = EntityFrameListener(self.entity)
-        ogr.addFrameListener(self.frameListener)
+        if self.entity.getAllAnimationStates():
+            self.frameListener = EntityFrameListener(self.entity)
+            ogr.addFrameListener(self.frameListener)
         #Common settings
         OgreStimulus.__init__(self, **kwargs)
 
@@ -486,15 +488,17 @@ class EntityStimulus(OgreStimulus):
 class HandStimulus(EntityStimulus):
     def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
+        animState = self.entity.getAnimationState('my_animation')
+        animState.setLoop(False)
         #The Hand's bounding box is not indicative of its size.
         #self._EntityStimulus__original_size = Coords.Size((1.5189208984375, 1.2220458984375, 1.366025447845459))
         #self.size = self._EntityStimulus__original_size * 80
-        self.scale(80)
-        import math
-        self.node.roll(-80*math.pi/180)
-        self.node.pitch(60*math.pi/180)
-        self.importPoses(n_poses)
-        self.setPose(0)
+        self.scale(1)
+        #import math
+        #self.node.roll(-80*math.pi/180)
+        #self.node.pitch(60*math.pi/180)
+        #self.importPoses(n_poses)
+        #self.setPose(0)
 
     def importPoses(self, n_poses=100):
         import json, os
@@ -731,19 +735,20 @@ class Text(OgreStimulus):
         #self.font_name = font_name #TODO: Fonts!
         self.__original_size = Coords.Size((len(text)*font_size/(16.0/6),font_size,1.0))
         #Common init steps: anchor, position, sticky, size, color, on
-        OgreStimulus.__init__(self, **kwargs)
+        OgreStimulus.__init__(self, size=self.__original_size, **kwargs)
 
-
+        
     def reset(self):
         desiredSize = super(Text, self).size
-        anch = self.anchor
+        anch = super(Text, self).anchor
+        #anch = self.anchor
         desiredAnchPos = super(Text, self).position
         #Account for negative sizes
         negDim = [x<0 for x in desiredSize]
         desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
         desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
         #Scale
-        origSize = self.__original_size
+        origSize = self._Text__original_size
         desiredScale = desiredSize/origSize
         #Position
         anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
