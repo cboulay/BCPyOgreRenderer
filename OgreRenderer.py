@@ -365,13 +365,17 @@ class EntityFrameListener(ogre.FrameListener):
         ogre.FrameListener.__init__(self)
         self.entity = entity
         self.animStates = self.entity.getAllAnimationStates()
+        animIt = self.animStates.getAnimationStateIterator()
+        while animIt.hasMoreElements():
+            animState = animIt.getNext()
+            self.entity.pause[animState.AnimationName] = False
 
     def frameRenderingQueued ( self, evt ):
         animIt = self.animStates.getAnimationStateIterator()
         while animIt.hasMoreElements():
             animState = animIt.getNext()
-            animState.addTime(evt.timeSinceLastFrame)
-        
+            if not self.entity.pause[animState.AnimationName]:
+                animState.addTime(evt.timeSinceLastFrame)
         return True
 
 class EntityStimulus(OgreStimulus):
@@ -394,6 +398,7 @@ class EntityStimulus(OgreStimulus):
         
         #Add a new frame listener to ogr for this stimulus' animations.
         if self.entity.getAllAnimationStates():
+            self.entity.pause = {}
             self.frameListener = EntityFrameListener(self.entity)
             ogr.addFrameListener(self.frameListener)
         #Common settings

@@ -3,6 +3,7 @@ BCPyOgreRenderer
 
 This is a drop-in replacement renderer for [BCPy2000](http://bci2000.org/downloads/BCPy2000/Renderers.html)
 using the [OGRE3D](http://www.ogre3d.org/) engine with its [Python-Ogre](http://www.python-ogre.org/) bindings.
+There are still many things to fix.
 
 ## Installation
 
