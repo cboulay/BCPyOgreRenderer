@@ -89,7 +89,9 @@ BCI2000 treats the PythonFilter as any other filter. Most of the C++ code is unr
 1. Calls BciGenericApplication._Preflight
     1. super's _Preflight doesn't do anything relevant to us.
     2. subclass (our app)'s Preflight
-        1. `self.screen.setup(frameless_window=0)` is our renderer setup
+        - `self.screen.setup(frameless_window=0)` is our renderer setup
+        - or `fullscreen(scale=float(self.params['WindowSize']), id=int(self.params['ScreenId']), frameless_window=(siz==1))`
+        - or don't use either and we will use ogre.cfg instead.
 2. Calls BciGenericApplication._Initialize
     1. super's _Initialize not relevant here.
     2. Get the 'visual display' thread, make sure it is ready, then post 'init'

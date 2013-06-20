@@ -33,11 +33,11 @@ class OgreThread(threading.Thread):
 
     def run(self):
         #Pass variables from OgreRenderer to OgreApplication
-        self.app._coords = self.renderer._coords
         self.app._plugins_path = self.renderer._plugins_path
         self.app._resource_path = self.renderer._resource_path
-        self.app._screen_scale = self.renderer._screen_scale
-        self.app._screen_params = self.renderer._screen_params
+        #self.app._coords = self.renderer._coords
+        #self.app._screen_scale = self.renderer._screen_scale
+        #self.app._screen_params = self.renderer._screen_params
         #Initialize the screen
         self.app.createRoot()
         self.app.defineResources()
@@ -68,6 +68,10 @@ class OgreRenderer(BciGenericRenderer):
         self.framerate = 60.#Returned if we don't really check the framerate
         self.screen = None
         self._bci = None
+        self._plugins_path = None
+        self._resource_path = None
+        self._coordinate_mapping = 'pixels from center'
+        self._bgcolor = (0.5, 0.5, 0.5)
 
     def __del__(self):
         "Clear variables, this should not actually be needed."
@@ -395,7 +399,7 @@ class EntityStimulus(OgreStimulus):
         self.node.attachObject(self.entity)
         orig_size = self.entity.getBoundingBox().getSize()
         self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
-        
+
         #Add a new frame listener to ogr for this stimulus' animations.
         if self.entity.getAllAnimationStates():
             self.entity.pause = {}
@@ -431,7 +435,7 @@ class EntityStimulus(OgreStimulus):
         return super(EntityStimulus, self).size
     @size.setter
     def size(self,value):
-       super(EntityStimulus, self.__class__).size.fset(self, value)
+        super(EntityStimulus, self.__class__).size.fset(self, value)
 
     @property
     def position(self):
@@ -495,13 +499,7 @@ class HandStimulus(EntityStimulus):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         animState = self.entity.getAnimationState('my_animation')
         animState.setLoop(False)
-        #The Hand's bounding box is not indicative of its size.
-        #self._EntityStimulus__original_size = Coords.Size((1.5189208984375, 1.2220458984375, 1.366025447845459))
-        #self.size = self._EntityStimulus__original_size * 80
-        self.scale(1)
-        #import math
-        #self.node.roll(-80*math.pi/180)
-        #self.node.pitch(60*math.pi/180)
+        self.scale(10) #This makes hand approx 10 units wide and tall and 30 units long (arm to fingertip)
         #self.importPoses(n_poses)
         #self.setPose(0)
 
@@ -609,6 +607,7 @@ class ImageStimulus(EntityStimulus):
     Arguments will include content or texture. Use that to make a ManualObject then call the mesh class.
     This class is meant to be laterally-compatible with VisionEggRenderer's ImageStimulus class.
     """
+    #TODO: This class still needs a lot of work.
     #http://www.ogre3d.org/tikiwiki/tiki-index.php?page=MadMarx+Tutorial+4&structure=Tutorials
     #http://wiki.python-ogre.org/index.php/Intermediate_Tutorial_4
     def __init__(self, content=None, texture=None, color=(1,1,1,1), **kwargs):
@@ -742,7 +741,7 @@ class Text(OgreStimulus):
         #Common init steps: anchor, position, sticky, size, color, on
         OgreStimulus.__init__(self, size=self.__original_size, **kwargs)
 
-        
+
     def reset(self):
         desiredSize = super(Text, self).size
         anch = super(Text, self).anchor

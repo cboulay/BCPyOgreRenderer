@@ -111,30 +111,29 @@ class Application(object):
 
     # Create the render window
     def createRenderWindow(self):
-
-        #=======================================================================
-        # self.root.initialise(True, self._screen_params["title"])
-        # self.renderWindow = self.root.getAutoCreatedWindow()
-        #=======================================================================
-
-        self.root.initialise(False)
-        hWnd = 0  # Get the hWnd of the application!
-        misc = ogre.NameValuePairList()
-        misc["externalWindowHandle"] = str(int(hWnd))
-        if self._screen_params["monitorIndex"] == -1:
-           try:
-               self._screen_params["monitorIndex"] = self.root.getDisplayMonitorCount()-1 #Only newer versions of Ogre
-           except:
-               import BCPy2000.AppTools.Displays as Displays
-               self._screen_params["monitorIndex"] = len(Displays.monitors())-1
-        #misc["border"] = self._screen_params["border"] #Causes unexpected behavior
-        misc["left"] = str(int(self._screen_params["left"]))
-        misc["top"] = str(int(self._screen_params["top"]))
-        #misc["monitorIndex"] = str(int(self._screen_params["monitorIndex"])) #Doesn't seem to work :(
-        if self._screen_scale:
-           pass#TODO: Get the size of the monitor and scale it if a scale is provided
-        scrw,scrh = int(self._coords.width), int(self._coords.height)
-        self.renderWindow = self.root.createRenderWindow(self._screen_params["title"], scrw, scrh, False, misc)
+        use_ogrecfg = True
+        if use_ogrecfg:
+            self.root.initialise(True, "BCPyOgre Window")
+            self.renderWindow = self.root.getAutoCreatedWindow()
+        else: #This requires the BCPy application to setup the screen using its parameters during preflight
+            self.root.initialise(False)
+            hWnd = 0  # Get the hWnd of the application
+            misc = ogre.NameValuePairList()
+            misc["externalWindowHandle"] = str(int(hWnd))
+            if self._screen_params["monitorIndex"] == -1:
+               try:
+                   self._screen_params["monitorIndex"] = self.root.getDisplayMonitorCount()-1 #Only newer versions of Ogre
+               except:
+                   import BCPy2000.AppTools.Displays as Displays
+                   self._screen_params["monitorIndex"] = len(Displays.monitors())-1
+            # misc["border"] = self._screen_params["border"] #Causes unexpected behavior
+            misc["left"] = str(int(self._screen_params["left"]))
+            misc["top"] = str(int(self._screen_params["top"]))
+            misc["monitorIndex"] = str(int(self._screen_params["monitorIndex"]))
+            if self._screen_scale:
+               pass#TODO: Get the size of the monitor and scale it if a scale is provided
+            scrw,scrh = int(self._coords.width), int(self._coords.height)
+            self.renderWindow = self.root.createRenderWindow(self._screen_params["title"], scrw, scrh, False, misc)
         self.renderWindow.setDeactivateOnFocusChange(False)
 
     # Initialize the resources here (which were read from resources.cfg in defineResources()
@@ -145,6 +144,7 @@ class Application(object):
     # Now, create a scene here. Three things that MUST BE done are sceneManager, camera and
     # viewport initializations
     def setupScene(self):
+        #Assume 1 ogre unit = 1 cm
         #Create and configure the scene manager
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
         self.sceneManager.setAmbientLight(ogre.ColourValue(0.9, 0.9, 0.9))
@@ -159,17 +159,16 @@ class Application(object):
         #self.viewPort.setBackgroundColour(self._bgcolor)
 
         #Place the camera as far from the 0 plane as the larger of the screen size
-        scrw,scrh = self.viewPort.getActualWidth(), self.viewPort.getActualHeight()
-        longd = max(scrw,scrh)
-        self.camera.setPosition( ogre.Vector3(0, 0, longd) )
+        
+        self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
         self.camera.lookAt( ogre.Vector3(0, 0, 0) )
-        self.camera.setNearClipDistance(round(longd/10))
+        self.camera.setNearClipDistance(10)
         self.camera.setAutoAspectRatio(True);
 
         #Add a light source
         self.light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        self.light.setPosition ( ogre.Vector3(scrw, scrh, longd/5.0) )
+        self.light.setPosition ( ogre.Vector3(100, 500, 10) )
         self.light.diffuseColour = 0.5, 0.5, 0.5
         self.light.specularColour = 0.3, 0.3, 0.3
 
