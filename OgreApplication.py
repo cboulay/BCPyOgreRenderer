@@ -121,17 +121,17 @@ class Application(object):
             misc = ogre.NameValuePairList()
             misc["externalWindowHandle"] = str(int(hWnd))
             if self._screen_params["monitorIndex"] == -1:
-               try:
-                   self._screen_params["monitorIndex"] = self.root.getDisplayMonitorCount()-1 #Only newer versions of Ogre
-               except:
-                   import BCPy2000.AppTools.Displays as Displays
-                   self._screen_params["monitorIndex"] = len(Displays.monitors())-1
+                try:
+                    self._screen_params["monitorIndex"] = self.root.getDisplayMonitorCount()-1 #Only newer versions of Ogre
+                except:
+                    import BCPy2000.AppTools.Displays as Displays
+                    self._screen_params["monitorIndex"] = len(Displays.monitors())-1
             # misc["border"] = self._screen_params["border"] #Causes unexpected behavior
             misc["left"] = str(int(self._screen_params["left"]))
             misc["top"] = str(int(self._screen_params["top"]))
             misc["monitorIndex"] = str(int(self._screen_params["monitorIndex"]))
             if self._screen_scale:
-               pass#TODO: Get the size of the monitor and scale it if a scale is provided
+                pass#TODO: Get the size of the monitor and scale it if a scale is provided
             scrw,scrh = int(self._coords.width), int(self._coords.height)
             self.renderWindow = self.root.createRenderWindow(self._screen_params["title"], scrw, scrh, False, misc)
         self.renderWindow.setDeactivateOnFocusChange(False)
@@ -159,7 +159,7 @@ class Application(object):
         #self.viewPort.setBackgroundColour(self._bgcolor)
 
         #Place the camera as far from the 0 plane as the larger of the screen size
-        
+
         self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
         self.camera.lookAt( ogre.Vector3(0, 0, 0) )
         self.camera.setNearClipDistance(10)
@@ -235,8 +235,8 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self._registeredAnimStates = []
 
     def __del__ (self ):
-      ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
-      self.windowClosed(self.renderWindow)
+        ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
+        self.windowClosed(self.renderWindow)
 
     def _inputSystemParameters (self ):
         """ ovreride to extend any OIS system parameters
@@ -244,52 +244,52 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         return []
 
     def _setupInput(self):
-         # ignore buffered input
+        # ignore buffered input
 
-         # FIXME: This should be fixed in C++ propbably
-         import platform
-         int64 = False
-         for bit in platform.architecture():
-             if '64' in bit:
-                 int64 = True
-         if int64:
-             windowHnd = self.renderWindow.getCustomAttributeUnsignedLong("WINDOW")
-         else:
-             windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
+        # FIXME: This should be fixed in C++ propbably
+        import platform
+        int64 = False
+        for bit in platform.architecture():
+            if '64' in bit:
+                int64 = True
+        if int64:
+            windowHnd = self.renderWindow.getCustomAttributeUnsignedLong("WINDOW")
+        else:
+            windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
 
-         #
-         # Here is where we create the OIS input system using a helper function that takes python list of tuples
-         #
-         t= self._inputSystemParameters()
-         params = [("WINDOW",str(windowHnd))]
-         params.extend(t)
-         self.InputManager = OIS.createPythonInputSystem( params )
+        #
+        # Here is where we create the OIS input system using a helper function that takes python list of tuples
+        #
+        t= self._inputSystemParameters()
+        params = [("WINDOW",str(windowHnd))]
+        params.extend(t)
+        self.InputManager = OIS.createPythonInputSystem( params )
 
-         #
-         # an alternate way is to use a multimap which is exposed in ogre
-         #
-#          pl = ogre.SettingsMultiMap()
-#          windowHndStr = str(windowHnd)
-#          pl.insert("WINDOW", windowHndStr)
-#          for  v in self._inputSystemParameters():
-#               pl.insert(v[0],v[1])
-#          im = OIS.InputManager.createInputSystem( pl )
+        #
+        # an alternate way is to use a multimap which is exposed in ogre
+        #
+        #          pl = ogre.SettingsMultiMap()
+        #          windowHndStr = str(windowHnd)
+        #          pl.insert("WINDOW", windowHndStr)
+        #          for  v in self._inputSystemParameters():
+        #               pl.insert(v[0],v[1])
+        #          im = OIS.InputManager.createInputSystem( pl )
 
-         #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
-         self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
-         self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
-         try:
+        #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
+        self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
+        self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
+        try:
             self.Joy = self.InputManager.createInputObjectJoyStick( OIS.OISJoyStick, self.bufferedJoy )
-         except:
+        except:
             self.Joy = False
-#
-         #Set initial mouse clipping size
-         self.windowResized(self.renderWindow)
+        #
+        #Set initial mouse clipping size
+        self.windowResized(self.renderWindow)
 
-         self.showDebugOverlay(True)
+        self.showDebugOverlay(True)
 
-         #Register as a Window listener
-         ogre.WindowEventUtilities.addWindowEventListener(self.renderWindow, self);
+        #Register as a Window listener
+        ogre.WindowEventUtilities.addWindowEventListener(self.renderWindow, self);
 
 
 
@@ -301,22 +301,22 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         pass
 
     def windowResized (self, rw):
-         dummyint = 0
-         width, height, depth, left, top= rw.getMetrics(dummyint,dummyint,dummyint, dummyint, dummyint)  # Note the wrapped function as default needs unsigned int's
-         ms = self.Mouse.getMouseState()
-         ms.width = width
-         ms.height = height
+        dummyint = 0
+        width, height, depth, left, top= rw.getMetrics(dummyint,dummyint,dummyint, dummyint, dummyint)  # Note the wrapped function as default needs unsigned int's
+        ms = self.Mouse.getMouseState()
+        ms.width = width
+        ms.height = height
 
     def windowClosed(self, rw):
-      #Only close for window that created OIS (mWindow)
-      if( rw == self.renderWindow ):
-         if( self.InputManager ):
-            self.InputManager.destroyInputObjectMouse( self.Mouse )
-            self.InputManager.destroyInputObjectKeyboard( self.Keyboard )
-            if self.Joy:
-                self.InputManager.destroyInputObjectJoyStick( self.Joy )
-            OIS.InputManager.destroyInputSystem(self.InputManager)
-            self.InputManager=None
+        #Only close for window that created OIS (mWindow)
+        if( rw == self.renderWindow ):
+            if( self.InputManager ):
+                self.InputManager.destroyInputObjectMouse( self.Mouse )
+                self.InputManager.destroyInputObjectKeyboard( self.Keyboard )
+                if self.Joy:
+                    self.InputManager.destroyInputObjectJoyStick( self.Joy )
+                OIS.InputManager.destroyInputSystem(self.InputManager)
+                self.InputManager=None
 
     ## NOTE the in Ogre 1.6 (1.7) this is changed to frameRenderingQueued !!!
     def frameRenderingQueued ( self, evt ):
@@ -441,9 +441,9 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         #=======================================================================
 
         if( self.Keyboard.isKeyDown(OIS.KC_F) and self.timeUntilNextToggle <= 0 ):
-             self.statisticsOn = not self.statisticsOn
-             self.showDebugOverlay(self.statisticsOn)
-             self.timeUntilNextToggle = 1
+            self.statisticsOn = not self.statisticsOn
+            self.showDebugOverlay(self.statisticsOn)
+            self.timeUntilNextToggle = 1
 
         if self.Keyboard.isKeyDown(OIS.KC_T) and self.timeUntilNextToggle <= 0:
             if self.filtering == ogre.TFO_BILINEAR:
