@@ -3,6 +3,8 @@ import os
 import os.path
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
+import StereoManager
+import math
 
 def getPluginPath():
     """ Return the absolute path to a valid plugins.cfg file.
@@ -158,6 +160,9 @@ class Application(object):
         self.viewPort = self.renderWindow.addViewport(self.camera)
         #self.viewPort.setBackgroundColour(self._bgcolor)
 
+        #self.mStereoManager = StereoManager.StereoManager(self.viewPort)
+        #self.mStereoManager.createDebugPlane(self.sceneManager)
+
         #Place the camera as far from the 0 plane as the larger of the screen size
 
         self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
@@ -195,7 +200,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
     """A default frame listener, which takes care of basic mouse and keyboard
     input."""
 
-    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False):
+    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False, appStereoManager = None):
         ogre.FrameListener.__init__(self)
         ogre.WindowEventListener.__init__(self)
         self.camera = camera
@@ -210,7 +215,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self.filtering = ogre.TFO_BILINEAR
         self.showDebugOverlay(True)
         self.rotateSpeed =  ogre.Degree(36)
-        self.moveSpeed = 100.0
+        self.moveSpeed = 10.0
         self.rotationSpeed = 8.0
         self.displayCameraDetails = False
         self.bufferedKeys = bufferedKeys
@@ -220,6 +225,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self.bufferedJoy = bufferedJoy
         self.shouldQuit = False # set to True to exit..
         self.MenuMode = False   # lets understand a simple menu function
+        self.appStereoManager = appStereoManager
 
         self.unittest = isUnitTest()
         self.unittest_duration = UnitTest_Duration()  # seconds before screen shot a exit
@@ -492,6 +498,39 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             o = self.camera.getDerivedOrientation()
             Application.debugText = "P: %.3f %.3f %.3f O: %.3f %.3f %.3f %.3f"  \
                         % (pos.x,pos.y,pos.z, o.w,o.x,o.y,o.z)
+
+        if self.Keyboard.isKeyDown(OIS.KC_SUBTRACT) and self.appStereoManager:
+            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() - self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
+        if self.Keyboard.isKeyDown(OIS.KC_ADD) and self.appStereoManager:
+            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() + self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
+        if self.Keyboard.isKeyDown(OIS.KC_DIVIDE) and self.appStereoManager:
+            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() / math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
+        if self.Keyboard.isKeyDown(OIS.KC_MULTIPLY) and self.appStereoManager:
+            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() * math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
+        if self.Keyboard.isKeyDown(OIS.KC_NUMPAD0) and self.appStereoManager:
+            self.appStereoManager.setEyesSpacing(0)
+        if self.Keyboard.isKeyDown(OIS.KC_DECIMAL) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            self.appStereoManager.setFocalLengthInfinite(not self.appStereoManager.isFocalLengthInfinite())
+            self.timeUntilNextToggle = 0.5
+        if self.Keyboard.isKeyDown(OIS.KC_0) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            self.appStereoManager.toggleDebugPlane()
+            self.timeUntilNextToggle = 0.5
+        if self.Keyboard.isKeyDown(OIS.KC_I) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            self.appStereoManager.saveConfig("stereo.cfg")
+            self.timeUntilNextToggle = 0.5
+        if self.Keyboard.isKeyDown(OIS.KC_U) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            toggle_list = self.appStereoManager.mAvailableModes.keys()
+            mode = self.appStereoManager.getStereoMode()
+            new_ix = toggle_list.index(mode)+1
+            if new_ix == len(toggle_list): new_ix = 0
+            newMode = toggle_list[new_ix]
+            lViewport = self.appStereoManager.mLeftViewport
+            rViewport = self.appStereoManager.mRightViewport
+            self.appStereoManager.shutdown()
+            self.appStereoManager.init(lViewport, rViewport, newMode)
+            self.timeUntilNextToggle = 0.2
+
+        if self.appStereoManager: self.appStereoManager.updateDebugPlane()
         return True
 
     def _isToggleKeyDown(self, keyCode, toggleTime = 1.0):

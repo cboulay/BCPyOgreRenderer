@@ -7,7 +7,7 @@ import ogre.renderer.OGRE as ogre
 import math
 
 class StereoManager(object):
-    def __init__(self, leftViewport, rightViewport, mode):
+    def __init__(self, leftViewport, rightViewport=None, mode="SM_ANAGLYPH_RC"):
         self.mStereoMode = None
         self.mDebugPlane = None
         self.mDebugPlaneNode = None
@@ -40,8 +40,8 @@ class StereoManager(object):
         if not self.mStereoMode:
             return
         self.mCamera = leftViewport.getCamera()
-        if self.mAvailableModes[self.mStereoMode].mUsesCompositor:
-            leftViewport, rightViewport = self.initCompositor(leftViewport, self.mAvailableModes[self.mStereoMode].mMaterialName)
+        if self.mAvailableModes[self.mStereoMode]["mUsesCompositor"]:
+            leftViewport, rightViewport = self.initCompositor(leftViewport, self.mAvailableModes[self.mStereoMode]["mMaterialName"])
 
         self.initListeners(leftViewport, rightViewport)
 
@@ -77,9 +77,9 @@ class StereoManager(object):
         mat = ogre.MaterialManager.getSingleton().getByName(materialName)
         self.mCompositorInstance.getTechnique().getOutputTargetPass().getPass(0).setMaterial(mat)
         out_left = self.mCompositorInstance.getRenderTarget("Stereo/Left").getViewport(0)
-        out_right = self.mCompositorInstance.getRenderTarget("Stereo/Right").getViewport()
-        self.mDeviceLostListener = DeviceLostListener(self)
-        ogre.Root.getSingleton().getRenderSystem().addListener(self.mDeviceLostListener)
+        out_right = self.mCompositorInstance.getRenderTarget("Stereo/Right").getViewport(0)
+        #self.mDeviceLostListener = DeviceLostListener(self)
+        #ogre.Root.getSingleton().getRenderSystem().addListener(self.mDeviceLostListener)
         return out_left, out_right
 
     def shutdownCompositor(self):
@@ -93,7 +93,7 @@ class StereoManager(object):
         if not self.mStereoMode:
             return
         self.shutdownListeners()
-        if self.mAvailableModes[self.mStereoMode].mUsesCompositor: self.shutdownCompositor()
+        if self.mAvailableModes[self.mStereoMode]["mUsesCompositor"]: self.shutdownCompositor()
         #TODO: Change the mRenderTargetList autoUpdated
         self.mStereoMode = None
 

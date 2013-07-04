@@ -499,7 +499,7 @@ class HandStimulus(EntityStimulus):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         animState = self.entity.getAnimationState('my_animation')
         animState.setLoop(False)
-        self.scale(10) #This makes hand approx 10 units wide and tall and 30 units long (arm to fingertip)
+        self.scale(3) #This makes hand approx 10 units wide and tall and 30 units long (arm to fingertip)
         #self.importPoses(n_poses)
         #self.setPose(0)
 
