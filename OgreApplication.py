@@ -3,7 +3,7 @@ import os
 import os.path
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
-import StereoManager
+#import StereoManager
 import math
 
 def getPluginPath():
@@ -163,8 +163,7 @@ class Application(object):
         #self.mStereoManager = StereoManager.StereoManager(self.viewPort)
         #self.mStereoManager.createDebugPlane(self.sceneManager)
 
-        #Place the camera as far from the 0 plane as the larger of the screen size
-
+        #Give the camera a default position, but your application should specify if you are using 3d objects.
         self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
         self.camera.lookAt( ogre.Vector3(0, 0, 0) )
         self.camera.setNearClipDistance(10)
@@ -176,6 +175,22 @@ class Application(object):
         self.light.setPosition ( ogre.Vector3(100, 500, 10) )
         self.light.diffuseColour = 0.5, 0.5, 0.5
         self.light.specularColour = 0.3, 0.3, 0.3
+
+        #Create a 2D overlay for text and 2D objects.
+        self.overlayManager = ogre.OverlayManager.getSingleton()
+        top_overlay = self.overlayManager.create("TopOverlay")
+        screen_panel = self.overlayManager.createOverlayElement("Panel", "screen")
+        screen_panel.setPosition(0, 0)
+        screen_panel.setDimensions(1, 1)
+        #screen_panel.setMetricsMode(ogre.GMM_PIXELS)
+        top_overlay.add2D(screen_panel)
+        #VisionEgg uses pixels and bottom left as origin so let's create such a panel for functions that emulate VisionEgg behavior.
+        ve_panel = self.overlayManager.createOverlayElement("Panel", "visionegg")
+        ve_panel.setMetricsMode(ogre.GMM_PIXELS)
+        ve_panel.setVerticalAlignment(ogre.GVA_BOTTOM)
+        ve_panel.setHorizontalAlignment(ogre.GHA_LEFT)
+        screen_panel.addChild(ve_panel)
+        top_overlay.show()
 
         #self.coordinate_mapping = self._coordinate_mapping
 
@@ -333,7 +348,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             if self.unittest_duration < 0:
                 self.renderWindow.writeContentsToFile(self.unittest_screenshot + '.jpg')
                 return False
-        
+
         # ##Need to capture/update each device - this will also trigger any listeners
         # self.Keyboard.capture()
         # self.Mouse.capture()
@@ -590,6 +605,8 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
 
 
 if __name__ == '__main__':
+    #These few lines will help debug in IPython.
+    #cd 'D:\\Tools\BCPyElectrophys'
     import threading
     ta = Application()
     def ogreFunc():
