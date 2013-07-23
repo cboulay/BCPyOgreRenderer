@@ -207,8 +207,9 @@ class Text():
         #We already have a panel that uses visionegg-like coordinates.
         #TopOverlay(Overlay)>screen(Panel)>visionegg(Panel)
         ovm = ogre.OverlayManager.getSingleton()
-        screen = ovm.getOverlayElement("screen")
-        ve = screen.getChild("visionegg")
+        #screen = ovm.getOverlayElement("screen")
+        #ve = screen.getChild("visionegg")
+        ve = ovm.getOverlayElement("TopOverlay")
 
         #We need a unique identifier.
         ix = 0
@@ -231,7 +232,8 @@ class Text():
         textArea.setVerticalAlignment( ogre.GVA_TOP )
 
         #Put them together.
-        ve.addChild(panel)
+        ve.add2D(panel)
+        #ve.addChild(panel)
         panel.addChild(textArea)#Add the text area to the panel
 
         #Store the variables
