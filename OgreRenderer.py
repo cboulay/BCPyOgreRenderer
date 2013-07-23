@@ -221,10 +221,14 @@ class Text():
         panel = ovm.createOverlayElement("Panel", 've_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
         panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
+        panel.setHorizontalAlignment( ogre.GHA_LEFT )
+        panel.setVerticalAlignment( ogre.GVA_TOP )
 
         #Create a text area
         textArea = ovm.createOverlayElement("TextArea", 've_text_' + str(ix))
         textArea.setMetricsMode(ogre.GMM_PIXELS)
+        textArea.setHorizontalAlignment( ogre.GHA_LEFT )
+        textArea.setVerticalAlignment( ogre.GVA_TOP )
 
         #Put them together.
         ve.addChild(panel)
@@ -238,8 +242,8 @@ class Text():
         self.text = text
         self.font_name = "BlueHighway" #font_name #TODO: Fonts other than BlueHighway
         self.font_size = font_size
-        self.anchor = anchor
-        self.position = position
+        #self.anchor = anchor
+        #self.position = position
         if color: self.color = color
         self.on = on
 
