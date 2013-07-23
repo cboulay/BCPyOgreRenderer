@@ -266,28 +266,28 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         #
         # Here is where we create the OIS input system using a helper function that takes python list of tuples
         #
-        t= self._inputSystemParameters()
-        params = [("WINDOW",str(windowHnd))]
-        params.extend(t)
-        self.InputManager = OIS.createPythonInputSystem( params )
+        # t= self._inputSystemParameters()
+        # params = [("WINDOW",str(windowHnd))]
+        # params.extend(t)
+        # self.InputManager = OIS.createPythonInputSystem( params )
 
-        #
-        # an alternate way is to use a multimap which is exposed in ogre
-        #
-        #          pl = ogre.SettingsMultiMap()
-        #          windowHndStr = str(windowHnd)
-        #          pl.insert("WINDOW", windowHndStr)
-        #          for  v in self._inputSystemParameters():
-        #               pl.insert(v[0],v[1])
-        #          im = OIS.InputManager.createInputSystem( pl )
+        # #
+        # # an alternate way is to use a multimap which is exposed in ogre
+        # #
+        # #          pl = ogre.SettingsMultiMap()
+        # #          windowHndStr = str(windowHnd)
+        # #          pl.insert("WINDOW", windowHndStr)
+        # #          for  v in self._inputSystemParameters():
+        # #               pl.insert(v[0],v[1])
+        # #          im = OIS.InputManager.createInputSystem( pl )
 
-        #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
-        self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
-        self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
-        try:
-            self.Joy = self.InputManager.createInputObjectJoyStick( OIS.OISJoyStick, self.bufferedJoy )
-        except:
-            self.Joy = False
+        # #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
+        # self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
+        # self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
+        # try:
+            # self.Joy = self.InputManager.createInputObjectJoyStick( OIS.OISJoyStick, self.bufferedJoy )
+        # except:
+            # self.Joy = False
         #
         #Set initial mouse clipping size
         self.windowResized(self.renderWindow)
@@ -309,9 +309,9 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
     def windowResized (self, rw):
         dummyint = 0
         width, height, depth, left, top= rw.getMetrics(dummyint,dummyint,dummyint, dummyint, dummyint)  # Note the wrapped function as default needs unsigned int's
-        ms = self.Mouse.getMouseState()
-        ms.width = width
-        ms.height = height
+        # ms = self.Mouse.getMouseState()
+        # ms.width = width
+        # ms.height = height
 
     def windowClosed(self, rw):
         #Only close for window that created OIS (mWindow)
@@ -333,39 +333,40 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             if self.unittest_duration < 0:
                 self.renderWindow.writeContentsToFile(self.unittest_screenshot + '.jpg')
                 return False
-        ##Need to capture/update each device - this will also trigger any listeners
-        self.Keyboard.capture()
-        self.Mouse.capture()
-        buffJ = True
-        if( self.Joy ):
-            self.Joy.capture()
-            buffJ = self.Joy.buffered()
+        
+        # ##Need to capture/update each device - this will also trigger any listeners
+        # self.Keyboard.capture()
+        # self.Mouse.capture()
+        # buffJ = True
+        # if( self.Joy ):
+            # self.Joy.capture()
+            # buffJ = self.Joy.buffered()
 
-        ##Check if one of the devices is not buffered
-        if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ :
-            ## one of the input modes is immediate, so setup what is needed for immediate movement
-            if self.timeUntilNextToggle >= 0:
-                self.timeUntilNextToggle -= evt.timeSinceLastFrame
+        # ##Check if one of the devices is not buffered
+        # if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ :
+            # ## one of the input modes is immediate, so setup what is needed for immediate movement
+            # if self.timeUntilNextToggle >= 0:
+                # self.timeUntilNextToggle -= evt.timeSinceLastFrame
 
-            ## Move about 100 units per second
-            self.moveScale = self.moveSpeed * evt.timeSinceLastFrame
-            ## Take about 10 seconds for full rotation
-            self.rotScale = self.rotateSpeed * evt.timeSinceLastFrame
+            # ## Move about 100 units per second
+            # self.moveScale = self.moveSpeed * evt.timeSinceLastFrame
+            # ## Take about 10 seconds for full rotation
+            # self.rotScale = self.rotateSpeed * evt.timeSinceLastFrame
 
-        self.rotationX = ogre.Degree(0.0)
-        self.rotationY = ogre.Degree(0.0)
-        self.translateVector = ogre.Vector3().ZERO
+        # self.rotationX = ogre.Degree(0.0)
+        # self.rotationY = ogre.Degree(0.0)
+        # self.translateVector = ogre.Vector3().ZERO
 
-        ##Check to see which device is not buffered, and handle it
-        if not self.Keyboard.buffered():
-            if  not self._processUnbufferedKeyInput(evt):
-                return False
-        if not self.Mouse.buffered():
-            if not self._processUnbufferedMouseInput(evt):
-                return False
+        # ##Check to see which device is not buffered, and handle it
+        # if not self.Keyboard.buffered():
+            # if  not self._processUnbufferedKeyInput(evt):
+                # return False
+        # if not self.Mouse.buffered():
+            # if not self._processUnbufferedMouseInput(evt):
+                # return False
 
-        if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ:
-            self._moveCamera()
+        # if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ:
+            # self._moveCamera()
 
         return True
 
