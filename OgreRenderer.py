@@ -708,31 +708,41 @@ class Text(OgreStimulus):
                   font_size=16, angle=0.0, smooth=True, **kwargs):
         #angle and smooth get eaten because I have no idea what they do
 
-        #Create an overlay
         ovm = ogre.OverlayManager.getSingleton()
+        screen = ovm.getOverlayElement("screen")
+        ve = screen.getChild("visionegg") #occupies the whole screen.
+
+        #We need a unique identifier.
         ix = 0
-        overlayname = 'Overlay_' + str(ix)
-        while ovm.getByName(overlayname):
+        veit = ve.getChildIterator()
+        while veit.hasMoreElements():
+            veit.getNext()
             ix += 1
-            overlayname = 'Overlay_' + str(ix)
-        overlay = ovm.create(overlayname)
+
         #Create a panel
-        panel = ovm.createOverlayElement("Panel", 'Panel_' + str(ix))
+        panel = ovm.createOverlayElement("Panel", 've_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
-        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
+        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel #Template/Black50
+        #panel.setHorizontalAlignment( ogre.GHA_LEFT )
+        #panel.setVerticalAlignment( ogre.GVA_BOTTOM )
+
         #Create a text area
-        textArea = ovm.createOverlayElement("TextArea", 'TextArea_' + str(ix))
+        textArea = ovm.createOverlayElement("TextArea", 've_text_' + str(ix))
+        #textArea size/position isn't important. It will take up the whole panel.
+#        textArea = ovm.createOverlayElement("TextArea", 'TextArea_' + str(ix))
         textArea.setMetricsMode(ogre.GMM_PIXELS)
         textArea.setPosition(0, 0)
         textArea.setVerticalAlignment( ogre.GVA_TOP )
-        #Put it together
-        overlay.add2D(panel)#Add the panel to the overlay
+
+        #Put them together.
         panel.addChild(textArea)#Add the text area to the panel
+        ve.addChild(panel)
+
         #Store the variables
-        self.overlay = overlay
         self.panel = panel
         self.textArea = textArea
-        #Some settings
+
+        #Set the properties using the vision-egg like setters and getters.
         self.text = text
         self.font_name = "BlueHighway"
         self.font_size = font_size
@@ -740,7 +750,6 @@ class Text(OgreStimulus):
         self.__original_size = Coords.Size((len(text)*font_size/(16.0/6),font_size,1.0))
         #Common init steps: anchor, position, sticky, size, color, on
         OgreStimulus.__init__(self, size=self.__original_size, **kwargs)
-
 
     def reset(self):
         desiredSize = super(Text, self).size
@@ -826,5 +835,5 @@ class Text(OgreStimulus):
         return self.panel.isVisible()
     @on.setter
     def on(self, value):
-        if value: self.overlay.show()
-        else: self.overlay.hide()
+        if value: self.panel.show()
+        else: self.panel.hide()
