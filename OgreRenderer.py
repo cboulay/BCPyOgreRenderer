@@ -6,17 +6,15 @@
 #TODO: Window placement. Removing the border causes unexpected placement
 #TODO: Framerate
 
-__all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
+#__all__ = ['Text', 'Block', 'Disc', 'ImageStimulus', 'Movie']
+__all__ = ['Text']
 
-import sys
-import os
 import os.path
-import time
-import OgreApplication #This is a typical python-ogre style application except it runs in a thread.
-import ogre.renderer.OGRE as ogre
 import BCPy2000.AppTools.Coords as Coords
 try:    from BCI2000PythonApplication    import BciGenericRenderer, BciStimulus   # development copy
 except: from BCPy2000.GenericApplication import BciGenericRenderer, BciStimulus   # installed copy
+import OgreApplication #This is a typical python-ogre style application except it runs in a thread.
+import ogre.renderer.OGRE as ogre
 import threading
 import Queue
 
@@ -145,11 +143,11 @@ class OgreRenderer(BciGenericRenderer):
         self.ogreQ.put({'Stop': True})
         #self.ogreQ.join() #Wait until the OgreApplication is cleaned up before continuing
 
-    def SetDefaultFont(self, name = None, size = None):
-        return SetDefaultFont(name=name, size=size)
-
-    def GetDefaultFont(self):
-        return GetDefaultFont()
+#    def SetDefaultFont(self, name = None, size = None):
+#        return SetDefaultFont(name=name, size=size)
+#
+#    def GetDefaultFont(self):
+#        return GetDefaultFont()
 
     @property
     def size(self):
@@ -207,9 +205,15 @@ class Text():
         #We already have a panel that uses visionegg-like coordinates.
         #TopOverlay(Overlay)>screen(Panel)>visionegg(Panel)
         ovm = ogre.OverlayManager.getSingleton()
-        #screen = ovm.getOverlayElement("screen")
-        #ve = screen.getChild("visionegg")
-        ve = ovm.getOverlayElement("TopOverlay")
+
+#        #Do I need the top overlay?
+#        ovit = ovm.getOverlayIterator()
+#        topoverlay = ovit.getNext()
+#        while topoverlay.Name != "TopOverlay":
+#            topoverlay = ovit.getNext()
+
+        screen = ovm.getOverlayElement("screen")
+        ve = screen.getChild("visionegg") #occupies the whole screen.
 
         #We need a unique identifier.
         ix = 0
@@ -221,38 +225,36 @@ class Text():
         #Create a panel
         panel = ovm.createOverlayElement("Panel", 've_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
-        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel
-        panel.setHorizontalAlignment( ogre.GHA_LEFT )
-        panel.setVerticalAlignment( ogre.GVA_TOP )
+        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel #Template/Black50
+        #panel.setHorizontalAlignment( ogre.GHA_LEFT )
+        #panel.setVerticalAlignment( ogre.GVA_BOTTOM )
 
         #Create a text area
         textArea = ovm.createOverlayElement("TextArea", 've_text_' + str(ix))
-        textArea.setMetricsMode(ogre.GMM_PIXELS)
-        textArea.setHorizontalAlignment( ogre.GHA_LEFT )
-        textArea.setVerticalAlignment( ogre.GVA_TOP )
+        #textArea size/position isn't important. It will take up the whole panel.
 
         #Put them together.
-        ve.add2D(panel)
-        #ve.addChild(panel)
         panel.addChild(textArea)#Add the text area to the panel
+        ve.addChild(panel)
 
         #Store the variables
-        #self.panel = panel
+        self.panel = panel
         self.textArea = textArea
 
         #Set the properties using the vision-egg like setters and getters.
-        self.text = text
-        self.font_name = "BlueHighway" #font_name #TODO: Fonts other than BlueHighway
-        self.font_size = font_size
+        self.mytext = text
+        self.myfont_name = "BlueHighway" #font_name #TODO: Fonts other than BlueHighway
+        self.myfont_size = font_size
         #self.anchor = anchor
-        #self.position = position
-        if color: self.color = color
-        self.on = on
+        self.myposition = position
+        if color: self.mycolor = color
+        self.myon = on
 
     @property
-    def anchor(self):
-        va = self.textArea.getVerticalAlignment()
-        ha = self.textArea.getHorizontalAlignment()
+    def myanchor(self): #topleft is -1,1, bottom left is -1,-1
+        print "myanchor getter"
+        va = self.panel.getVerticalAlignment()
+        ha = self.panel.getHorizontalAlignment()
         if va == ogre.GVA_TOP:
             va = 1
         elif va == ogre.GVA_BOTTOM:
@@ -265,9 +267,10 @@ class Text():
             ha = 1
         if ha == ogre.GHA_CENTER:
             ha = 0
-        return tuple(ha, va)
-    @anchor.setter
-    def anchor(self, value):
+        return (ha, va)
+    @myanchor.setter
+    def myanchor(self, value):
+        print "myanchor setter"
         #value can be of the form (-1,-1) or 'lower-left'
         if isinstance(value, basestring): #if string
             words = ('center', 'center', 'middle', 'left', 'right', 'bottom', 'top', 'lower', 'upper')
@@ -288,81 +291,96 @@ class Text():
                     elif k=='top' or 'upper':
                         out[1] = -1
         if value[0]==-1:
-            self.textArea.setHorizontalAlightment( ogre.GHA_LEFT )
+            self.panel.setHorizontalAlightment( ogre.GHA_LEFT )
         elif value[0] == 1:
-            self.textArea.setHorizontalAlightment( ogre.GHA_RIGHT )
+            self.panel.setHorizontalAlightment( ogre.GHA_RIGHT )
         elif value[0] == 0:
-            self.textArea.setHorizontalAlightment( ogre.GHA_CENTER )
+            self.panel.setHorizontalAlightment( ogre.GHA_CENTER )
         if value[1]==-1:
-            self.textArea.setVerticalAlignment( ogre.GVA_TOP )
+            self.panel.setVerticalAlignment( ogre.GVA_TOP )
         elif value[1] == 1:
-            self.textArea.setVerticalAlignment( ogre.GVA_BOTTOM )
+            self.panel.setVerticalAlignment( ogre.GVA_BOTTOM )
         elif value[1] == 0:
-            self.textArea.setVerticalAlignment( ogre.GVA_CENTER )
+            self.panel.setVerticalAlignment( ogre.GVA_CENTER )
 
     @property
-    def position(self):
-        anch = self.anchor
+    def myposition(self):
+        anch = self.myanchor
         if anch[0] == -1:
-            x = self.textArea.getLeft()
+            x = self.panel.getLeft()
         elif anch[0] == 1:
-            x = self.textArea.getLeft() + self.panel.getWidth()
+            x = self.panel.getLeft() + self.panel.getWidth()
         elif anch[0] == 0:
-            x = self.textArea.getLeft() + self.panel.getWidth()/2
-        if anch[1] == -1:
-            y = self.textArea.getTop()
-        elif anch[1] == 1:
-            y = self.textArea.getTop() - self.panel.getHeight()
+            x = self.panel.getLeft() + self.panel.getWidth()/2
+        if anch[1] == 1:
+            y = self.panel.getTop()
+        elif anch[1] == -1:
+            y = self.panel.getTop() - self.panel.getHeight()
         elif anch[1] == 0:
-            y = self.textArea.getTop() - self.panel.getHeight()/2
-        return tuple(x,y)
-    @position.setter
-    def position(self,value):
+            y = self.panel.getTop() - self.panel.getHeight()/2
+        print "position getter"
+        return (x,y)
+    @myposition.setter
+    def myposition(self,value):
         value = tuple(value)
-        self.textArea.setPosition(value[0], value[1])
+        print "position setter"
+        self.panel.setPosition(value[0], value[1])
 
     @property
-    def color(self):
+    def mycolor(self): #works.
         """Text color"""
+        print "Text color getter"
         col = self.textArea.getColourTop()
         return (col.r, col.g, col.b, col.a)
-    @color.setter
-    def color(self, value):
+    @mycolor.setter
+    def mycolor(self, value): #does not work.
+        print "Text color setter"
         self.textArea.setColourTop( ogre.ColourValue(*value) )
         self.textArea.setColourBottom( ogre.ColourValue(*value) )
 
     @property
-    def text(self):
+    def mytext(self):
         """Text"""
+        print "Text text getter"
         return self.textArea.getCaption()
-    @text.setter
-    def text(self, text):
+    @mytext.setter
+    def mytext(self, text):
+        print "Text text setter"
+        temp = len(text)*self.font_size/(16.0/6)
+        self.panel.setWidth(temp)
         self.textArea.setCaption(text)
 
     @property
-    def font_size(self):
+    def myfont_size(self):
         """Font Size"""
+        print "Text font_size getter"
         return self.textArea.getCharHeight()
-    @font_size.setter
-    def font_size(self, value):
+    @myfont_size.setter
+    def myfont_size(self, value):
+        print "Text font_size setter"
+        self.panel.setHeight(value)
         self.textArea.setCharHeight(value)
 
     @property
-    def font_name(self):
+    def myfont_name(self):
         """Font Name"""
+        print "Text font_name getter"
         return self.textArea.getFontName()
-    @font_name.setter
-    def font_name(self, value):
+    @myfont_name.setter
+    def myfont_name(self, value):
+        print "Text font_name setter"
         self.textArea.setFontName(value)
 
     @property
-    def on(self):
+    def myon(self):
         """Hidden or not"""
-        return self.textArea.isVisible()
-    @on.setter
-    def on(self, value):
-        if value: self.textArea.show()
-        else: self.textArea.hide()
+        print "Text on getter"
+        return self.panel.isVisible()
+    @myon.setter
+    def myon(self, value):
+        print "Text on setter"
+        if value: self.panel.show()
+        else: self.panel.hide()
 
 class OgreStimulus(Coords.Box):
     """Superclass for EntityStimulus and Text.
