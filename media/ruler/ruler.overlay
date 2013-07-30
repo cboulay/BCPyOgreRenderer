@@ -1,0 +1,15 @@
+// Ogre overlay scripts
+MyOverlays/Ruler
+{
+	zorder 500
+	container Panel(MyOverlays/RulerPanel)
+	{
+		metrics_mode pixels
+		//vert_align bottom
+		//left 3 
+		//top -92
+		width 4016
+		height 159
+		material MyMaterials/Ruler
+	}
+}
