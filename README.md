@@ -8,7 +8,7 @@ There are still many things to fix.
 ## Installation
 
 My [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) implementation of BCPy2000 requires Python 2.6.
-Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.6.4%20SnapShot/Python-Ogre-Core-1.6.4-r1017-py263.7z/download) compatible with Python 2.6.
+Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.7.1/ogre-1.7.1-r1125.7z/download) compatible with Python 2.6.
 [Install instructions](http://www.cse.unr.edu/~sushil/class/381/ware/pythonOgreWin7Install.pdf).
 (If you already installed BCPy2000 then you can skip steps 1-3).
 
@@ -34,9 +34,9 @@ This is not true for `z`. i.e., `hand.z = 10` is not equivalent to `hand.obj.z =
 ### Virtual Hand
 
 One reason for using a 3D engine is that I would like to use BCPy2000 to control the animation of a virtual hand.
-I am using [libhand](www.libhand.org). It comes with an OGRE model but that is not compatible with PythonOgre 1.6.4.
-Therefore I used the Blender model, then [exported](https://code.google.com/p/blender2ogre/)
-to a generic OGRE .xml, then converted it to the correct version using the tools found in the PythonOgre 1.6.4 snapshot release.
+I am using [libhand](www.libhand.org). It comes with an OGRE model that is compatible with Ogre 1.7.1 (linked above).
+If for some reason you use a different Ogre version, you may use the Blender model, then [export it](https://code.google.com/p/blender2ogre/)
+to a generic OGRE .xml, then converted it to the correct version using the [tools](http://sourceforge.net/projects/ogre/files/ogre-tools/) for your version of Ogre.
 
 ### Renderer Life-Cycle
 

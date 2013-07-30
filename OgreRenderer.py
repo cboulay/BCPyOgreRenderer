@@ -364,7 +364,7 @@ class OgreStimulus(Coords.Box):
         super(OgreStimulus, self.__class__).anchor.fset(self, value)
         self.reset()
 
-class EntityFrameListener(ogre.FrameListener):
+class EntityStimulusAnimFrameListener(ogre.FrameListener):
     def __init__(self, entity):
         ogre.FrameListener.__init__(self)
         self.entity = entity
@@ -382,7 +382,32 @@ class EntityFrameListener(ogre.FrameListener):
                 animState.addTime(evt.timeSinceLastFrame)
         return True
 
-class EntityStimulus(OgreStimulus):
+class EntityStimulusMoveFrameListener(ogre.FrameListener):
+    def __init__(self, entitystim):
+        ogre.FrameListener.__init__(self)
+        self.entitystim = entitystim
+
+    def frameRenderingQueued ( self, evt ):
+        if self.entitystim.isMoving:
+            curr_pos = self.entitystim.node.getPosition()
+            curr_spd = [0.0, 0.0, 0.0]
+            stop_moving = True
+            for ix in range(0,3):
+                curr_spd[ix] = self.entitystim.move_spd[ix]*evt.timeSinceLastFrame
+                pos_diff = self.entitystim.desired_position[ix] - curr_pos[ix]
+                if abs(pos_diff) <= abs(curr_spd[ix]):
+                    curr_spd[ix] = pos_diff
+                else:
+                    stop_moving = False
+            self.entitystim.node.translate(curr_spd)
+            if stop_moving:
+                self.entitystim.node.setPosition(self.entitystim.desired_position)
+                self.entitystim.move_spd = [0.0, 0.0, 0.0]
+                self.entitystim.isMoving = False
+        return True
+
+#class EntityStimulus(OgreStimulus):
+class EntityStimulus():
     """Creates a 3D Ogre object using provided mesh or entity.
     """
     def __init__(self, mesh_name='hand.mesh', entity=None, parent=None, **kwargs):
@@ -397,57 +422,61 @@ class EntityStimulus(OgreStimulus):
         parent = parent if parent else self.sceneManager.getRootSceneNode()
         self.node = parent.createChildSceneNode(self.entity.getName() + 'Node', (0,0,0))
         self.node.attachObject(self.entity)
-        orig_size = self.entity.getBoundingBox().getSize()
-        self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        #orig_size = self.entity.getBoundingBox().getSize()
+        #self.__original_size = Coords.Size((orig_size[0],orig_size[1],orig_size[2]))
+        self.move() #Initialize some variables.
+        self.moveFrameListener = EntityStimulusMoveFrameListener(self)
+        ogr.addFrameListener(self.moveFrameListener)
 
         #Add a new frame listener to ogr for this stimulus' animations.
         if self.entity.getAllAnimationStates():
             self.entity.pause = {}
-            self.frameListener = EntityFrameListener(self.entity)
-            ogr.addFrameListener(self.frameListener)
+            self.animFrameListener = EntityStimulusAnimFrameListener(self.entity)
+            ogr.addFrameListener(self.animFrameListener)
         #Common settings
-        OgreStimulus.__init__(self, **kwargs)
+        #OgreStimulus.__init__(self, **kwargs)
+        self.ogr = ogr
 
-    def reset(self):
-        desiredSize = super(EntityStimulus, self).size
-        anch = super(EntityStimulus, self).anchor
-        desiredAnchPos = super(EntityStimulus, self).position
-        #Account for negative sizes
-        negDim = [x<0 for x in desiredSize]
-        desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
-        desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
-        #Scale
-        origSize = self.__original_size
-        desiredScale = desiredSize/origSize
-        #Position
-        anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
-        desiredNodePos = desiredAnchPos - anch*desiredSize/2#Unadjust the anchor position to get node position
-        self.node.setScale(desiredScale[0],desiredScale[1],desiredScale[2])
-        self.node.setPosition(desiredNodePos[0],desiredNodePos[1],desiredNodePos[2])
-
-    @property
-    def size(self):
-        trueSize = self.entity.getWorldBoundingBox().getSize()
-        trueSize = (trueSize[0], trueSize[1], trueSize[2])#Convert from Ogre to tuple
-        if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
-            trueSize = self.__original_size
-        Coords.Box.size.fset(self, trueSize)
-        return super(EntityStimulus, self).size
-    @size.setter
-    def size(self,value):
-        super(EntityStimulus, self.__class__).size.fset(self, value)
-
-    @property
-    def position(self):
-        nodePos = self.node.getPosition() #Get the true position
-        nodePos = Coords.Point([nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
-        anchorPos = nodePos+self.anchor*self.size/2 #Adjust for the anchor
-        Coords.Box.position.fset(self, anchorPos)
-        return super(EntityStimulus, self).position
-    @position.setter
-    def position(self,value):
-        super(EntityStimulus, self.__class__).position.fset(self, value)
-
+#    def reset(self):
+#        desiredSize = super(EntityStimulus, self).size
+#        anch = super(EntityStimulus, self).anchor
+#        desiredAnchPos = super(EntityStimulus, self).position
+#        #Account for negative sizes
+#        negDim = [x<0 for x in desiredSize]
+#        desiredSize = [-siz if neg else siz for siz,neg in zip(desiredSize,negDim)]
+#        desiredSize = Coords.Size([siz if siz>0 else 1.0 for siz in desiredSize])#Make sure we never try to set size to 0
+#        #Scale
+#        origSize = self.__original_size
+#        desiredScale = desiredSize/origSize
+#        #Position
+#        anch = [-1*a if neg else a for a,neg in zip(anch,negDim)]#Reposition the anchor if we have any negative sizes
+#        desiredNodePos = desiredAnchPos - anch*desiredSize/2#Unadjust the anchor position to get node position
+#        self.node.setScale(desiredScale[0],desiredScale[1],desiredScale[2])
+#        self.node.setPosition(desiredNodePos[0],desiredNodePos[1],desiredNodePos[2])
+#
+#    @property
+#    def size(self):
+#        trueSize = self.entity.getWorldBoundingBox().getSize()
+#        trueSize = (trueSize[0], trueSize[1], trueSize[2])#Convert from Ogre to tuple
+#        if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
+#            trueSize = self.__original_size
+#        Coords.Box.size.fset(self, trueSize)
+#        return super(EntityStimulus, self).size
+#    @size.setter
+#    def size(self,value):
+#        super(EntityStimulus, self.__class__).size.fset(self, value)
+#
+#    @property
+#    def position(self):
+#        nodePos = self.node.getPosition() #Get the true position
+#        nodePos = Coords.Point([nodePos[0], nodePos[1], nodePos[2]]) #Convert to screen coordinates
+#        anchorPos = nodePos+self.anchor*self.size/2 #Adjust for the anchor
+#        Coords.Box.position.fset(self, anchorPos)
+#        return super(EntityStimulus, self).position
+#    @position.setter
+#    def position(self,value):
+#        super(EntityStimulus, self.__class__).position.fset(self, value)
+#
     @property
     def on(self):
         """Hidden or not"""
@@ -455,27 +484,27 @@ class EntityStimulus(OgreStimulus):
     @on.setter
     def on(self, value):
         self.entity.setVisible(value)
-
-    @property
-    def color(self):
-        """Color"""
-        return self.__color
-    @color.setter
-    def color(self, value):
-        #Might not have much of an effect depending on material type
-        value = tuple(value)
-        if len(value)<4: value = value + (1.0,)
-        r,g,b,a = float(value[0]), float(value[1]), float(value[2]), float(value[3])
-        nsubs = self.entity.getNumSubEntities()
-        for se_ix in range(nsubs):
-            se = self.entity.getSubEntity(se_ix)
-            mat = se.getMaterial()
-            mat.setAmbient(r,g,b)
-            mat.setDiffuse(r,g,b,a)
-            mat.setSpecular(r,g,b,a)
-            mat.setSelfIllumination(r,g,b)
-        self.__color = value
-
+#
+#    @property
+#    def color(self):
+#        """Color"""
+#        return self.__color
+#    @color.setter
+#    def color(self, value):
+#        #Might not have much of an effect depending on material type
+#        value = tuple(value)
+#        if len(value)<4: value = value + (1.0,)
+#        r,g,b,a = float(value[0]), float(value[1]), float(value[2]), float(value[3])
+#        nsubs = self.entity.getNumSubEntities()
+#        for se_ix in range(nsubs):
+#            se = self.entity.getSubEntity(se_ix)
+#            mat = se.getMaterial()
+#            mat.setAmbient(r,g,b)
+#            mat.setDiffuse(r,g,b,a)
+#            mat.setSpecular(r,g,b,a)
+#            mat.setSelfIllumination(r,g,b)
+#        self.__color = value
+#
     def makeMaterialUnique(self, entity):
         matMgr = ogre.MaterialManager.getSingleton()
         nsubs = entity.getNumSubEntities()
@@ -494,12 +523,30 @@ class EntityStimulus(OgreStimulus):
                 newmat.setSceneBlending(ogre.SceneBlendType.SBT_TRANSPARENT_ALPHA)
             se.setMaterial(newmat)
 
+    def move(self, new_position = None, duration = 0):
+        curr_pos = self.node.getPosition() #ogre.Vector3
+        if not new_position:
+            self.desired_position = curr_pos
+            self.move_spd = [0.0, 0.0, 0.0]
+            self.isMoving = False
+        else:
+            #get vector between points.
+            self.desired_position = new_position
+            if duration > 0:
+                self.move_spd = [(self.desired_position[x]-curr_pos[x])/duration for x in range(0,3)]
+                self.isMoving = True
+            else:
+                self.node.setPosition(new_position)
+                self.move_spd = [0.0, 0.0, 0.0]
+                self.isMoving = False
+
 class HandStimulus(EntityStimulus):
     def __init__(self, mesh_name='hand.mesh', n_poses=100, **kwargs):
         EntityStimulus.__init__(self, mesh_name='hand.mesh', **kwargs)
         animState = self.entity.getAnimationState('my_animation')
         animState.setLoop(False)
-        self.scale(3) #This makes hand approx 10 units wide and tall and 30 units long (arm to fingertip)
+        #I scaled the hand permanently (3/3/3) so it is approx 10 units wide and tall and 30 units long (arm to fingertip)
+        #self.scale(3)
         #self.importPoses(n_poses)
         #self.setPose(0)
 
@@ -722,7 +769,7 @@ class Text(OgreStimulus):
         #Create a panel
         panel = ovm.createOverlayElement("Panel", 've_' + str(ix))
         panel.setMetricsMode(ogre.GMM_PIXELS)
-        panel.setMaterialName("Template/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel #Template/Black50
+        panel.setMaterialName("MyMaterials/Black50")#BaseWhite #Example/ShadowsOverlay #POCore/Panel #MyMaterials/Black50
         #panel.setHorizontalAlignment( ogre.GHA_LEFT )
         #panel.setVerticalAlignment( ogre.GVA_BOTTOM )
 

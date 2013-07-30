@@ -1,4 +1,4 @@
-material Template/Black50
+material MyMaterials/Black50
  {
    technique
    {
@@ -16,7 +16,7 @@ material Template/Black50
    }
  }
  
- material Template/White50
+ material MyMaterials/White50
  {
    technique
    {
