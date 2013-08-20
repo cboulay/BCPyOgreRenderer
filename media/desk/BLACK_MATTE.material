@@ -1,0 +1,35 @@
+// BLACK_MATTE genrated by blender2ogre 0.5.9
+
+material BLACK_MATTE 
+{
+    receive_shadows on 
+
+    technique
+    {
+        pass BLACK_MATTE
+        {
+            ambient 0.08240000158548355 0.08240000158548355 0.08240000158548355 1.0
+            diffuse 0.0659200022506714 0.0659200022506714 0.0659200022506714 1.0
+            specular 0.05000000074505806 0.05000000074505806 0.05000000074505806 1.0 0.5
+            emissive 0.0 0.0 0.0 1.0
+
+            alpha_to_coverage off
+            colour_write on
+            cull_hardware clockwise
+            depth_check on
+            depth_func less_equal
+            depth_write on
+            illumination_stage 
+            light_clip_planes off
+            light_scissor off
+            lighting on
+            normalise_normals off
+            polygon_mode solid
+            scene_blend one zero
+            scene_blend_op add
+            shading gouraud
+            transparent_sorting on
+
+        }
+    }
+}

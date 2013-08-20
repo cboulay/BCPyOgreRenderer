@@ -1,0 +1,62 @@
+<scene formatVersion="1.0.1" export_time="1375266012.877443" previous_export_time="1375263163.411737" exported_by="貴晴" >
+  <nodes >
+    <node name="Armature" >
+      <position x="0.000000" y="0.000000" z="-0.000000" />
+      <rotation qx="0.000000" qy="0.000000" qz="-0.000000" qw="1.000000" />
+      <scale x="1.000000" y="1.000000" z="1.000000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <node name="Shape1" >
+        <position x="0.000000" y="0.000000" z="-0.000000" />
+        <rotation qx="0.000000" qy="0.000000" qz="-0.000000" qw="1.000000" />
+        <scale x="1.000000" y="1.000000" z="1.000000" />
+        <game >
+          <sensors />
+          <actuators />
+        </game>
+        <entity damping_rot="0.10000000149011612" mass_radius="1.0" inertia_tensor="0.4000000059604645" lock_rot_x="False" physics_type="STATIC" name="Shape1" velocity_min="0.0" velocity_max="0.0" lock_rot_y="False" anisotropic_friction="False" lock_rot_z="False" ghost="False" actor="False" lock_trans_z="False" damping_trans="0.03999999910593033" lock_trans_x="False" lock_trans_y="False" friction_x="1.0" friction_y="1.0" friction_z="1.0" meshFile="Shape1.mesh" mass="1.0" />
+      </node>
+    </node>
+    <node name="Lamp" >
+      <position x="7.168764" y="10.014939" z="3.194078" />
+      <rotation qx="0.261215" qy="0.476099" qz="-0.185555" qw="0.818942" />
+      <scale x="1.000000" y="1.000000" z="1.000000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <light powerScale="1.0" shadow="true" name="Lamp" type="directional" >
+        <position x="7.168764" y="10.014939" z="3.194078" />
+        <lightAttenuation quadratic="0.0" range="5000" linear="0.03333335240683057" constant="1.0" />
+        <direction x="0.055" y="-0.795" z="0.605" />
+        <colourDiffuse r="1.0" b="1.0" g="1.0" />
+        <colourSpecular r="1.0" b="1.0" g="1.0" />
+        <colourShadow r="1.0" b="1.0" g="1.0" />
+      </light>
+    </node>
+    <node name="Camera" >
+      <position x="8.843714" y="5.432216" z="8.141714" />
+      <rotation qx="0.499220" qy="0.344102" qz="-0.225238" qw="0.762654" />
+      <scale x="0.999990" y="1.000015" z="1.000008" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <camera projectionType="perspective" fov="0.5033799435163735" name="Camera" >
+        <clipping nearPlaneDist="0.10000000149011612" far="100.0" farPlaneDist="100.0" near="0.10000000149011612" />
+      </camera>
+    </node>
+  </nodes>
+  <externals >
+    <item type="material" >
+      <file name="C:\blender image files\blender to ogre\saw\01___Default.material" />
+    </item>
+  </externals>
+  <environment >
+    <colourAmbient r="0.0" b="0.0" g="0.0" />
+    <colourBackground r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+    <colourDiffuse r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+  </environment>
+</scene>
