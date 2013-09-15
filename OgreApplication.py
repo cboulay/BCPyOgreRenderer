@@ -3,29 +3,27 @@ import os
 import os.path
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
-import StereoManager
+#import StereoManager
 import math
+
+DOHMD = False #Use Head-Mounted Display
 
 def getPluginPath():
     """ Return the absolute path to a valid plugins.cfg file.
-    look in the current directory for plugins.cfg followed by plugins.cfg.nt|linux|mac
-    If not found look one directory up
+    Look for plugins.cfg followed by plugins.cfg.nt|linux|mac
+    in the current directory, BCPyOgreRenderer subdirectory, and parent directory.
     """
-
-    paths = [os.path.join(os.getcwd(), 'plugins.cfg'),
-             os.path.join(os.getcwd(), 'BCPyOgreRenderer', 'plugins.cfg'),
-             os.path.join(os.getcwd(), '..','plugins.cfg'),
-             ]
-    if os.sys.platform == 'darwin':
-        paths.insert(1, os.path.join(os.getcwd(), 'plugins.cfg.mac'))
-        paths.append(os.path.join(os.getcwd(), '..', 'plugins.cfg.mac'))
-    else:
-        paths.insert(1,os.path.join(os.getcwd(), 'plugins.cfg.'+os.name))
-        paths.append(os.path.join(os.getcwd(), '..', 'plugins.cfg.'+os.name))
-
-    for path in paths:
-        if os.path.exists(path):
-            return path
+    suffix = 'mac' if os.sys.platform == 'darwin' else os.name
+    search_dirs = [  os.getcwd(),
+                     os.path.join(os.getcwd(), 'BCPyOgreRenderer'),
+                     os.path.join(os.getcwd(), '..'),
+                   ]
+    for search_dir in search_dirs:
+        paths = [os.path.join(search_dir, 'plugins.cfg'),
+                os.path.join(search_dir, 'plugins.cfg.'+suffix)]
+        for path in paths:
+            if os.path.exists(path):
+                return path
 
     sys.stderr.write("\n"
         "** Warning: Unable to locate a suitable plugins.cfg file.\n"
@@ -58,7 +56,7 @@ class Application(object):
     debugText=""
     app_title = "MyApplication"
 
-    def fakeIt(self):
+    def fakeInit(self):
         """Set some self variables that would normally be set by the BCPy Renderer wrapper."""
         import BCPy2000.AppTools.Coords as Coords
         self._plugins_path = None
@@ -80,6 +78,15 @@ class Application(object):
         self.initializeResourceGroups()
         self.setupScene()
         self.createFrameListener()
+        #Add a demo object
+        hand_ent = self.sceneManager.createEntity('hand.meshEntity', 'hand.mesh')
+        hand_node = self.sceneManager.getRootSceneNode().createChildSceneNode(hand_ent.getName()+'Node', (0,0,0))
+        hand_node.attachObject(hand_ent)
+        animState = hand_ent.getAnimationState('my_animation')
+        animState.timePosition = 0.0
+        animState.setLoop(True)
+        animState.setEnabled(True)
+        self.hand_ent = hand_ent
         #self.setupCEGUI()
         self.startRenderLoop()
         self.cleanUp()
@@ -153,21 +160,74 @@ class Application(object):
         #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
         #self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
 
-        #Create and configure the camera
-        self.camera = self.sceneManager.createCamera("Camera")
+        
+        
+        if not DOHMD:
+            #Create and configure the camera
+            self.camera = self.sceneManager.createCamera("Camera")
 
-        #Create and configure the viewPort
-        self.viewPort = self.renderWindow.addViewport(self.camera)
-        #self.viewPort.setBackgroundColour(self._bgcolor)
+            #Create and configure the viewPort
+            self.viewPort = self.renderWindow.addViewport(self.camera)
+            #self.viewPort.setBackgroundColour(self._bgcolor)
 
-        #self.mStereoManager = StereoManager.StereoManager(self.viewPort)
-        #self.mStereoManager.createDebugPlane(self.sceneManager)
+            #self.mStereoManager = StereoManager.StereoManager(self.viewPort)
+            #self.mStereoManager.createDebugPlane(self.sceneManager)
 
-        #Give the camera a default position, but your application should specify if you are using 3d objects.
-        self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
-        self.camera.lookAt( ogre.Vector3(0, 0, 0) )
-        self.camera.setNearClipDistance(10)
-        self.camera.setAutoAspectRatio(True);
+            #Give the camera a default position, but your application should specify if you are using 3d objects.
+            self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
+            self.camera.lookAt( ogre.Vector3(0, 0, 0) )
+            self.camera.setNearClipDistance(10)
+            self.camera.setAutoAspectRatio(True);
+        else:
+            pass
+            # Create camera node
+            # Create two cameras
+            # Ogre::MaterialPtr matLeft = Ogre::MaterialManager::getSingleton().getByName("Ogre/Compositor/Oculus");
+            # Ogre::MaterialPtr matRight = matLeft->clone("Ogre/Compositor/Oculus/Right");
+            # Ogre::GpuProgramParametersSharedPtr pParamsLeft = matLeft->getTechnique(0)->getPass(0)->getFragmentProgramParameters();
+            # Ogre::GpuProgramParametersSharedPtr pParamsRight = matRight->getTechnique(0)->getPass(0)->getFragmentProgramParameters();
+            # Ogre::Vector4 hmdwarp;
+            # hmdwarp = ogre.Vector4(distortionk[0], distortionk[1], distortionk[2], distortionk[3])
+            # pParamsLeft->setNamedConstant("HmdWarpParam", hmdwarp);
+            # pParamsRight->setNamedConstant("HmdWarpParam", hmdwarp);
+            # pParamsLeft->setNamedConstant("LensCentre", 0.5f+(m_stereoConfig->GetProjectionCenterOffset()/2.0f));
+            # pParamsRight->setNamedConstant("LensCentre", 0.5f-(m_stereoConfig->GetProjectionCenterOffset()/2.0f));
+
+            # Ogre::CompositorPtr comp = Ogre::CompositorManager::getSingleton().getByName("OculusRight");
+            # comp->getTechnique(0)->getOutputTargetPass()->getPass(0)->setMaterialName("Ogre/Compositor/Oculus/Right");
+
+            # for(int i=0;i<2;++i)
+            # {
+                # m_cameraNode->attachObject(m_cameras[i]);
+                # if(m_stereoConfig)
+                # {
+                    # // Setup cameras.
+                    # m_cameras[i]->setNearClipDistance(m_stereoConfig->GetEyeToScreenDistance());
+                    # m_cameras[i]->setFarClipDistance(g_defaultFarClip);
+                    # m_cameras[i]->setPosition((i * 2 - 1) * m_stereoConfig->GetIPD() * 0.5f, 0, 0);
+                    # m_cameras[i]->setAspectRatio(m_stereoConfig->GetAspect());
+                    # m_cameras[i]->setFOVy(Ogre::Radian(m_stereoConfig->GetYFOVRadians()));
+                    
+                    # // Oculus requires offset projection, create a custom projection matrix
+                    # Ogre::Matrix4 proj = Ogre::Matrix4::IDENTITY;
+                    # float temp = m_stereoConfig->GetProjectionCenterOffset();
+                    # proj.setTrans(Ogre::Vector3(-m_stereoConfig->GetProjectionCenterOffset() * (2 * i - 1), 0, 0));
+                    # m_cameras[i]->setCustomProjectionMatrix(true, proj * m_cameras[i]->getProjectionMatrix());
+                # }
+                # else
+                # {
+                    # m_cameras[i]->setNearClipDistance(g_defaultNearClip);
+                    # m_cameras[i]->setFarClipDistance(g_defaultFarClip);
+                    # m_cameras[i]->setPosition((i*2-1) * g_defaultIPD * 0.5f, 0, 0);
+                # }
+                # m_viewports[i] = win->addViewport(m_cameras[i], i, 0.5f*i, 0, 0.5f, 1.0f);
+                # m_viewports[i]->setBackgroundColour(g_defaultViewportColour);
+                # m_compositors[i] = Ogre::CompositorManager::getSingleton().addCompositor(m_viewports[i],i==0?"OculusLeft":"OculusRight");
+                # m_compositors[i]->setEnabled(true);
+            # }
+        
+        
+        
 
         #Add a light source
         self.light = self.sceneManager.createLight("Light1")
@@ -202,6 +262,9 @@ class Application(object):
         #self.frameListener.showDebugOverlay(True)
         self.frameListener.showDebugOverlay(False)
         self.root.addFrameListener(self.frameListener)
+        if DOHMD:
+            self.oculusFrameListener = OculusFrameListener(self.oculus, self.camera)
+            self.root.addFrameListener(self.oculusFrameListener)
 
     def startRenderLoop(self):
         self.root.startRendering()
@@ -210,12 +273,24 @@ class Application(object):
         # Clean up Ogre
         self.root.shutdown()
         del self.root
+        
+class OculusFrameListener(ogre.FrameListener):
+    def __init__(self, oculus, camera):
+        ogre.FrameListener.__init__(self)
+        #need reference to the camera nodes
+        #need reference to oculus
+
+    def frameRenderingQueued ( self, evt ):
+        #new_orient = oculus.rot_quat
+        #cameraNode.setOrientation(new_orient)
+        return True
 
 class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
     """A default frame listener, which takes care of basic mouse and keyboard
     input."""
 
-    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False, appStereoManager = None):
+    #def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False, appStereoManager = None):
+    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False):
         ogre.FrameListener.__init__(self)
         ogre.WindowEventListener.__init__(self)
         self.camera = camera
@@ -240,7 +315,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self.bufferedJoy = bufferedJoy
         self.shouldQuit = False # set to True to exit..
         self.MenuMode = False   # lets understand a simple menu function
-        self.appStereoManager = appStereoManager
+        # self.appStereoManager = appStereoManager
 
         self.unittest = isUnitTest()
         self.unittest_duration = UnitTest_Duration()  # seconds before screen shot a exit
@@ -256,7 +331,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self._registeredAnimStates = []
 
     def __del__ (self ):
-        ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
+        #ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
         self.windowClosed(self.renderWindow)
 
     def _inputSystemParameters (self ):
@@ -515,38 +590,38 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             Application.debugText = "P: %.3f %.3f %.3f O: %.3f %.3f %.3f %.3f"  \
                         % (pos.x,pos.y,pos.z, o.w,o.x,o.y,o.z)
 
-        if self.Keyboard.isKeyDown(OIS.KC_SUBTRACT) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() - self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
-        if self.Keyboard.isKeyDown(OIS.KC_ADD) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() + self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
-        if self.Keyboard.isKeyDown(OIS.KC_DIVIDE) and self.appStereoManager:
-            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() / math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
-        if self.Keyboard.isKeyDown(OIS.KC_MULTIPLY) and self.appStereoManager:
-            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() * math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
-        if self.Keyboard.isKeyDown(OIS.KC_NUMPAD0) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(0)
-        if self.Keyboard.isKeyDown(OIS.KC_DECIMAL) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.setFocalLengthInfinite(not self.appStereoManager.isFocalLengthInfinite())
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_0) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.toggleDebugPlane()
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_I) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.saveConfig("stereo.cfg")
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_U) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            toggle_list = self.appStereoManager.mAvailableModes.keys()
-            mode = self.appStereoManager.getStereoMode()
-            new_ix = toggle_list.index(mode)+1
-            if new_ix == len(toggle_list): new_ix = 0
-            newMode = toggle_list[new_ix]
-            lViewport = self.appStereoManager.mLeftViewport
-            rViewport = self.appStereoManager.mRightViewport
-            self.appStereoManager.shutdown()
-            self.appStereoManager.init(lViewport, rViewport, newMode)
-            self.timeUntilNextToggle = 0.2
+        # if self.Keyboard.isKeyDown(OIS.KC_SUBTRACT) and self.appStereoManager:
+            # self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() - self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
+        # if self.Keyboard.isKeyDown(OIS.KC_ADD) and self.appStereoManager:
+            # self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() + self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
+        # if self.Keyboard.isKeyDown(OIS.KC_DIVIDE) and self.appStereoManager:
+            # self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() / math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
+        # if self.Keyboard.isKeyDown(OIS.KC_MULTIPLY) and self.appStereoManager:
+            # self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() * math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
+        # if self.Keyboard.isKeyDown(OIS.KC_NUMPAD0) and self.appStereoManager:
+            # self.appStereoManager.setEyesSpacing(0)
+        # if self.Keyboard.isKeyDown(OIS.KC_DECIMAL) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            # self.appStereoManager.setFocalLengthInfinite(not self.appStereoManager.isFocalLengthInfinite())
+            # self.timeUntilNextToggle = 0.5
+        # if self.Keyboard.isKeyDown(OIS.KC_0) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            # self.appStereoManager.toggleDebugPlane()
+            # self.timeUntilNextToggle = 0.5
+        # if self.Keyboard.isKeyDown(OIS.KC_I) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            # self.appStereoManager.saveConfig("stereo.cfg")
+            # self.timeUntilNextToggle = 0.5
+        # if self.Keyboard.isKeyDown(OIS.KC_U) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
+            # toggle_list = self.appStereoManager.mAvailableModes.keys()
+            # mode = self.appStereoManager.getStereoMode()
+            # new_ix = toggle_list.index(mode)+1
+            # if new_ix == len(toggle_list): new_ix = 0
+            # newMode = toggle_list[new_ix]
+            # lViewport = self.appStereoManager.mLeftViewport
+            # rViewport = self.appStereoManager.mRightViewport
+            # self.appStereoManager.shutdown()
+            # self.appStereoManager.init(lViewport, rViewport, newMode)
+            # self.timeUntilNextToggle = 0.2
 
-        if self.appStereoManager: self.appStereoManager.updateDebugPlane()
+        # if self.appStereoManager: self.appStereoManager.updateDebugPlane()
         return True
 
     def _isToggleKeyDown(self, keyCode, toggleTime = 1.0):
@@ -606,11 +681,11 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
 
 if __name__ == '__main__':
     import threading
-    ta = Application()
+    self = Application()
     def ogreFunc():
         try:
-            ta.fakeIt()
-            ta.go()
+            self.fakeInit() #Fake the initialization that would happen from a BCPy2000 application.
+            self.go()
         except ogre.OgreException, e:
             print e
     ogreThread = threading.Thread(target=ogreFunc)
