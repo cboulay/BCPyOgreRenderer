@@ -158,7 +158,6 @@ class Application(object):
         #Assume 1 ogre unit = 1 m since the oculus rift returns units that way.
         #Create and configure the scene manager
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
-
         if self.hmd:
             rift_info = self.hmd.info
             #Create the l/r cameras
@@ -284,6 +283,9 @@ class Application(object):
         #self.frameListener.showDebugOverlay(True)
         self.frameListener.showDebugOverlay(False)
         self.root.addFrameListener(self.frameListener)
+        if DOHMD:
+            self.oculusFrameListener = OculusFrameListener(self.oculus, self.camera)
+            self.root.addFrameListener(self.oculusFrameListener)
 
     def startRenderLoop(self):
         self.root.startRendering()
@@ -292,6 +294,17 @@ class Application(object):
         # Clean up Ogre
         self.root.shutdown()
         del self.root
+        
+class OculusFrameListener(ogre.FrameListener):
+    def __init__(self, oculus, camera):
+        ogre.FrameListener.__init__(self)
+        #need reference to the camera nodes
+        #need reference to oculus
+
+    def frameRenderingQueued ( self, evt ):
+        #new_orient = oculus.rot_quat
+        #cameraNode.setOrientation(new_orient)
+        return True
 
 class HMDFrameListener(ogre.FrameListener):
     def __init__(self, hmd, cameraNode):
@@ -334,7 +347,6 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self.bufferedJoy = bufferedJoy
         self.shouldQuit = False # set to True to exit..
         self.MenuMode = False   # lets understand a simple menu function
-
         self.unittest = isUnitTest()
         self.unittest_duration = UnitTest_Duration()  # seconds before screen shot a exit
 #         self.unittest_screenshot = sys.modules['__main__'].__file__.split('.')[0]     # file name for unittest screenshot

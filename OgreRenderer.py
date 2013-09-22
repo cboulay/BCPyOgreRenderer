@@ -22,8 +22,6 @@ import Queue
 
 class OgreThread(threading.Thread):
     """The thread in which ogre will render itself.
-    This needs to occur in stages (messages):
-    1-
     """
     def __init__(self, queue, renderer, app):
         threading.Thread.__init__(self)
