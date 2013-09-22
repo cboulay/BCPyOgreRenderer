@@ -72,6 +72,7 @@ class OgreRenderer(BciGenericRenderer):
         self._resource_path = None
         self._coordinate_mapping = 'pixels from center'
         self._bgcolor = (0.5, 0.5, 0.5)
+        self._usehmd = False
 
     def __del__(self):
         "Clear variables, this should not actually be needed."
@@ -81,10 +82,13 @@ class OgreRenderer(BciGenericRenderer):
     def setup(self, width = 800, height = 600, left = 0, top = 0,
             bgcolor = (0.5, 0.5, 0.5), frameless_window = None, title="BCPyOgre",
             plugins_path = None, resource_path = None,
-            coordinate_mapping = 'pixels from center', id=None, scale=None, **kwds):
+            coordinate_mapping = 'pixels from center', id=None, scale=None, usehmd=False, **kwds):
         """BCI2000 parameters relevant to the display are passed in here,
         during the Application Preflight, either directly or through AppTools.Displays.fullscreen, on the main thread.
         """
+        if usehmd:
+            width,height = 600,800
+            bgcolor = (0.0, 0.0, 0.0)
         self._coords = Coords.Box(left=left, top=top, width=width, height=height, sticky=True, anchor='top left')
         self._bgcolor = bgcolor
         self._plugins_path = plugins_path
@@ -99,12 +103,18 @@ class OgreRenderer(BciGenericRenderer):
                                 "top": top,
                                 "monitorIndex": self._screen_id
                                 }
+        self._usehmd = usehmd
 
     def Initialize(self, bci=None):
         #Called after generic preflights, after generic _Initialize, but before application Initialize
         #On the 'visual display' thread
         self._bci = bci
         self.app = OgreApplication.Application()
+        if self._usehmd:
+            import Rift
+            self.app.hmd = Rift.Rift()
+        else:
+            self.app.hmd = None
         self.ogreQ=Queue.Queue()
         self.thread = OgreThread(self.ogreQ, self, self.app)
         self.thread.setDaemon(True) #Not sure if necessary
@@ -157,9 +167,17 @@ class OgreRenderer(BciGenericRenderer):
         return (self.width,self.height)
     def get_size(self): return self.size
     @property
-    def width(self): return self.app.viewPort.getActualWidth()
+    def width(self):
+        if self.app.hmd:
+            return 2*self.app.viewPorts[0].getActualWidth()
+        else:
+            return self.app.viewPort.getActualWidth()
     @property
-    def height(self): return self.app.viewPort.getActualHeight()
+    def height(self):
+        if self.app.hmd:
+            return self.app.viewPorts[0].getActualHeight()
+        else:
+            return self.app.viewPort.getActualHeight()
 
     @property
     def bgcolor(self):
@@ -168,7 +186,11 @@ class OgreRenderer(BciGenericRenderer):
     @bgcolor.setter
     def bgcolor(self, value):
         self._bgcolor = value
-        self.app.viewPort.setBackgroundColour(self._bgcolor)
+        if self.app.hmd:
+            for vp in self.app.viewPorts:
+                vp.setBackgroundColour(self._bgcolor)
+        else:
+            self.app.viewPort.setBackgroundColour(self._bgcolor)
     color=bgcolor
 
     @property
@@ -176,7 +198,8 @@ class OgreRenderer(BciGenericRenderer):
         return self._coordinate_mapping
     @coordinate_mapping.setter
     def coordinate_mapping(self, value):
-        zpos = self.app.camera.getPosition()[2]
+        #zpos = self.app.camera.getPosition()[2]
+        zpos = 0.0
         cm = value.lower().replace('bottom', 'lower').replace('top', 'upper').replace(' ', '')
         scrw,scrh = self.size
         longd = max((scrw,scrh))
@@ -189,9 +212,14 @@ class OgreRenderer(BciGenericRenderer):
             #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
             self.app.light.setPosition ( ogre.Vector3(scrw, -scrh, longd) )
         elif cm == 'pixelsfromcenter': #OgreRenderer default
-            self.app.camera.setPosition( ogre.Vector3(0, 0, zpos) )
+            if self.app.hmd:
+                pass
+                #for cam in self.app.cameras:
+                #    cam.setPosition(ogre.Vector3(0, 0, zpos))
+            else:
+                self.app.camera.setPosition( ogre.Vector3(0, 0, zpos) )
             #self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
-            self.app.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
+            #self.app.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
         else:
             raise ValueError('coordinate_mapping "%s" is unsupported' % value)
         self._coordinate_mapping = value
@@ -546,7 +574,7 @@ class HandStimulus(EntityStimulus):
         animState = self.entity.getAnimationState('my_animation')
         animState.setLoop(False)
         #I scaled the hand permanently (3/3/3) so it is approx 10 units wide and tall and 30 units long (arm to fingertip)
-        #self.scale(3)
+        #i.e. 1 unit = 1 cm
         #self.importPoses(n_poses)
         #self.setPose(0)
 

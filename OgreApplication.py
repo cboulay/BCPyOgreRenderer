@@ -3,29 +3,26 @@ import os
 import os.path
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
-import StereoManager
 import math
+
+DOHMD = True #Use Head-Mounted Display
 
 def getPluginPath():
     """ Return the absolute path to a valid plugins.cfg file.
-    look in the current directory for plugins.cfg followed by plugins.cfg.nt|linux|mac
-    If not found look one directory up
+    Look for plugins.cfg followed by plugins.cfg.nt|linux|mac
+    in the current directory, BCPyOgreRenderer subdirectory, and parent directory.
     """
-
-    paths = [os.path.join(os.getcwd(), 'plugins.cfg'),
-             os.path.join(os.getcwd(), 'BCPyOgreRenderer', 'plugins.cfg'),
-             os.path.join(os.getcwd(), '..','plugins.cfg'),
-             ]
-    if os.sys.platform == 'darwin':
-        paths.insert(1, os.path.join(os.getcwd(), 'plugins.cfg.mac'))
-        paths.append(os.path.join(os.getcwd(), '..', 'plugins.cfg.mac'))
-    else:
-        paths.insert(1,os.path.join(os.getcwd(), 'plugins.cfg.'+os.name))
-        paths.append(os.path.join(os.getcwd(), '..', 'plugins.cfg.'+os.name))
-
-    for path in paths:
-        if os.path.exists(path):
-            return path
+    suffix = 'mac' if os.sys.platform == 'darwin' else os.name
+    search_dirs = [  os.getcwd(),
+                     os.path.join(os.getcwd(), 'BCPyOgreRenderer'),
+                     os.path.join(os.getcwd(), '..'),
+                   ]
+    for search_dir in search_dirs:
+        paths = [os.path.join(search_dir, 'plugins.cfg'),
+                os.path.join(search_dir, 'plugins.cfg.'+suffix)]
+        for path in paths:
+            if os.path.exists(path):
+                return path
 
     sys.stderr.write("\n"
         "** Warning: Unable to locate a suitable plugins.cfg file.\n"
@@ -58,7 +55,7 @@ class Application(object):
     debugText=""
     app_title = "MyApplication"
 
-    def fakeIt(self):
+    def fakeInit(self):
         """Set some self variables that would normally be set by the BCPy Renderer wrapper."""
         import BCPy2000.AppTools.Coords as Coords
         self._plugins_path = None
@@ -71,6 +68,7 @@ class Application(object):
                                 "top": 0,
                                 "title": "MyApplication"
                                }
+        self.hmd = None
 
     def go(self):
         self.createRoot()
@@ -80,6 +78,17 @@ class Application(object):
         self.initializeResourceGroups()
         self.setupScene()
         self.createFrameListener()
+
+        #Add a demo object
+        hand_ent = self.sceneManager.createEntity('hand.meshEntity', 'hand.mesh')
+        hand_node = self.sceneManager.getRootSceneNode().createChildSceneNode(hand_ent.getName()+'Node', (0,0,-15))
+        hand_node.attachObject(hand_ent)
+        animState = hand_ent.getAnimationState('my_animation')
+        animState.timePosition = 0.0
+        animState.setLoop(True)
+        animState.setEnabled(True)
+        self.hand_ent = hand_ent
+
         #self.setupCEGUI()
         self.startRenderLoop()
         self.cleanUp()
@@ -116,7 +125,7 @@ class Application(object):
         use_ogrecfg = True
         if use_ogrecfg:
             self.root.initialise(True, "BCPyOgre Window")
-            self.renderWindow = self.root.getAutoCreatedWindow()
+            self.renderWindow = self.root.getAutoCreatedWindow() #Should be 1280 x 800 if working on OVR dev kit.
         else: #This requires the BCPy application to setup the screen using its parameters during preflight
             self.root.initialise(False)
             hWnd = 0  # Get the hWnd of the application
@@ -146,35 +155,102 @@ class Application(object):
     # Now, create a scene here. Three things that MUST BE done are sceneManager, camera and
     # viewport initializations
     def setupScene(self):
-        #Assume 1 ogre unit = 1 cm
+        #Assume 1 ogre unit = 1 m since the oculus rift returns units that way.
         #Create and configure the scene manager
         self.sceneManager = self.root.createSceneManager(ogre.ST_GENERIC, "Default SceneManager")
-        self.sceneManager.setAmbientLight(ogre.ColourValue(0.9, 0.9, 0.9))
+
+        if self.hmd:
+            rift_info = self.hmd.info
+            #Create the l/r cameras
+            self.cameraNode = self.sceneManager.getRootSceneNode().createChildSceneNode("StereoCameraNode")# Create camera node
+            self.cameras = [self.sceneManager.createCamera(cam_string) for cam_string in ["CameraLeft", "CameraRight"]]# Create two cameras
+            #Add the l/r viewports to the cameras
+            self.viewPorts = [self.renderWindow.addViewport(self.cameras[ix], ix, 0.5*ix, 0, 0.5, 1) for ix in range(2)] #cam, z-ord, left, top, w, h
+            for ix in range(2):
+                self.viewPorts[ix].setBackgroundColour(ogre.ColourValue(0/255.0, 0/255.0, 0/255.0))
+                
+            #Configure the separate cameras
+            #Set the l/r projection matrices (needs aspect, fov, center of lens rel to screen center)
+            my_asp = rift_info['aspect'] if True else 0.8 #0.5*HRes/VRes = 0.8
+            my_fovy = ogre.Radian(rift_info['yfovrad']) if True else ogre.Radian(ogre.Degree(110)) #2arctan( VScreenSize / (2*EyeToScreenDistance) )
+            my_ipd = rift_info['ipd'] if True else 0.064
+            my_znear = rift_info['eye_to_screen_distance'] if True else 0.01
+            my_zfar = 10000.0
+            my_pco = rift_info['projection_center_offset'] if True else 0.14529906
+            my_proj = [ogre.Matrix4(*[it for sl in rift_info['proj_mats'][lr_str] for it in sl]) for lr_str in ['left','right']]
+            #P for screen center = [[1/(my_asp * tan(my_fovy/2)), 0, 0, 0], [0, 1/(my_asp * tan(my_fovy/2)), 0, 0], [0, 0, zfar/(znear-zfar), zfar*znear/(znear-zfar)], [0, 0, -1, 0]]
+            #P for lens center = H*P where H = [[1, 0, 0, h], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]] (-h for right eye; h=lens center relative to screen center)
+            #V for eye location
+            for ix in range(2):
+                self.cameraNode.attachObject(self.cameras[ix])
+                self.cameras[ix].setNearClipDistance(my_znear)
+                self.cameras[ix].setFarClipDistance(my_zfar)
+                self.cameras[ix].setPosition((ix*2-1) * my_ipd * 0.5, 0, 0)
+                self.cameras[ix].setAspectRatio(my_asp)
+                self.cameras[ix].setFOVy(my_fovy)
+                #proj = ogre.Matrix4(ogre.Quaternion())
+                #proj.setTrans(ogre.Vector3(-my_pco * (2 * ix - 1), 0, 0)) #adjust for lens centers
+                #self.cameras[ix].setCustomProjectionMatrix(True, proj * self.cameras[ix].getProjectionMatrix())
+                self.cameras[ix].setCustomProjectionMatrix(True, my_proj[ix])
+                
+            #Set the barrel distortion compensation.
+            my_distortion = rift_info['distortion'] if True else [1.0, 0.22, 0.24, 0]
+            hmdwarp = ogre.Vector4(my_distortion[0], my_distortion[1], my_distortion[2], my_distortion[3])
+            matLeft = ogre.MaterialManager.getSingleton().getByName("Ogre/Compositor/Oculus")
+            mats = [matLeft, matLeft.clone("Ogre/Compositor/Oculus/Right")]
+            pParams = [mat.getTechnique(0).getPass(0).getFragmentProgramParameters() for mat in mats]
+            self.compositors = []
+            scaleFactor = 1.0 / rift_info['distortion_scale']
+            for ix in range(2):
+                pParam = pParams[ix]
+#                pPostProcessShader->SetUniform2f("LensCenter",
+#                                                 x + (w + Distortion.XCenterOffset * 0.5f)*0.5f, y + h*0.5f);
+#                pPostProcessShader->SetUniform2f("ScreenCenter", x + w*0.5f, y + h*0.5f);
+#                // MA: This is more correct but we would need higher-res texture vertically; we should adopt this
+#                // once we have asymmetric input texture scale.
+#                float scaleFactor = 1.0f / Distortion.Scale;
+#                pPostProcessShader->SetUniform2f("Scale",   (w/2) * scaleFactor, (h/2) * scaleFactor * as);
+#                pPostProcessShader->SetUniform2f("ScaleIn", (2/w),               (2/h) / as);
+#                pPostProcessShader->SetUniform4f("HmdWarpParam",
+#                                                 Distortion.K[0], Distortion.K[1], Distortion.K[2], Distortion.K[3]);
+                pParam.setNamedConstant("LensCentre", 0.5 + ((1-2*ix)*my_pco)*0.5) #x + (w + Distortion.XCenterOffset * 0.5f)*0.5f, y+h*0.5f
+                #pParam.setNamedConstant("Scale", 0.25*scaleFactor) #(w/2) * scaleFactor, (h/2) * scaleFactor * as = 0.25*scaleFactor, 0.5*scaleFactor*my_asp
+                #pParam.setNamedConstant("ScaleIn", 4.0) #2/w, (2/h)/as = 4, 2/my_asp
+                pParam.setNamedConstant("HmdWarpParam", hmdwarp)
+                
+                self.compositors.append(ogre.CompositorManager.getSingleton().addCompositor(self.viewPorts[ix], "OculusLeft" if ix==0 else "OculusRight"))
+                self.compositors[ix].setEnabled(True)
+            comp = ogre.CompositorManager.getSingleton().getByName("OculusRight")
+            comp.getTechnique(0).getOutputTargetPass().getPass(0).setMaterialName("Ogre/Compositor/Oculus/Right")
+
+        else:
+            #Create and configure the camera
+            #Think about doing orthographic camera
+            self.camera = self.sceneManager.createCamera("Camera")
+            #Create and configure the viewPort
+            self.viewPort = self.renderWindow.addViewport(self.camera)
+            #self.viewPort.setBackgroundColour(self._bgcolor)
+
+            #Give the camera a default position, but your application should specify if you are using 3d objects.
+            #self.camera.setPosition( ogre.Vector3(0, 0, 0) )
+            #self.camera.lookAt( ogre.Vector3(0, 0, -1) )
+            self.camera.setNearClipDistance(0.01)
+            self.camera.setAutoAspectRatio(True);
+
+        light = self.sceneManager.createLight("light");
+        light.setType(ogre.Light.LT_DIRECTIONAL)
+        light.setDirection(-0.577, -0.577, -0.577)
+        light.setDiffuseColour(ogre.ColourValue(1.0, 1.0, 1.0))
+        self.sceneManager.setAmbientLight(ogre.ColourValue(0.4, 0.4, 0.4))
         #self.sceneManager.setSkyDome(True, 'Examples/CloudySky',4, 8)
         #self.sceneManager.setFog( ogre.FOG_EXP, ogre.ColourValue(1,1,1),0.0005)
-
-        #Create and configure the camera
-        self.camera = self.sceneManager.createCamera("Camera")
-
-        #Create and configure the viewPort
-        self.viewPort = self.renderWindow.addViewport(self.camera)
-        #self.viewPort.setBackgroundColour(self._bgcolor)
-
-        #self.mStereoManager = StereoManager.StereoManager(self.viewPort)
-        #self.mStereoManager.createDebugPlane(self.sceneManager)
-
-        #Give the camera a default position, but your application should specify if you are using 3d objects.
-        self.camera.setPosition( ogre.Vector3(0, 0, 100) )#1 m from center
-        self.camera.lookAt( ogre.Vector3(0, 0, 0) )
-        self.camera.setNearClipDistance(10)
-        self.camera.setAutoAspectRatio(True);
-
+        
         #Add a light source
-        self.light = self.sceneManager.createLight("Light1")
+        #self.light = self.sceneManager.createLight("Light1")
         #light.type = ogre.Light.LT_POINT
-        self.light.setPosition ( ogre.Vector3(100, 500, 10) )
-        self.light.diffuseColour = 0.5, 0.5, 0.5
-        self.light.specularColour = 0.3, 0.3, 0.3
+        #self.light.setPosition ( ogre.Vector3(1, 5, 0.10) )
+        #self.light.diffuseColour = 0.5, 0.5, 0.5
+        #self.light.specularColour = 0.3, 0.3, 0.3
 
         #Create a 2D overlay for text and 2D objects.
         self.overlayManager = ogre.OverlayManager.getSingleton()
@@ -196,8 +272,14 @@ class Application(object):
 
     def createFrameListener(self):
         """Creates the FrameListener."""
+        if self.hmd:
+            self.hmdFrameListener = HMDFrameListener(self.hmd, self.cameraNode)
+            self.root.addFrameListener(self.hmdFrameListener)
+            camera = self.cameras[0]
+        else:
+            camera = self.camera
         #,self.frameListener, self.frameListener.Mouse
-        self.frameListener = FrameListener(self.renderWindow, self.camera)
+        self.frameListener = FrameListener(self.renderWindow, camera)
         #self.frameListener.unittest = self.unittest
         #self.frameListener.showDebugOverlay(True)
         self.frameListener.showDebugOverlay(False)
@@ -211,11 +293,23 @@ class Application(object):
         self.root.shutdown()
         del self.root
 
+class HMDFrameListener(ogre.FrameListener):
+    def __init__(self, hmd, cameraNode):
+        ogre.FrameListener.__init__(self)
+        self.hmd = hmd
+        self.cameraNode = cameraNode
+
+    def frameRenderingQueued ( self, evt ):
+        new_quat = self.hmd.rot_quat
+        #newOrient = ogre.Quaternion() * new_quat
+        self.cameraNode.setOrientation(ogre.Quaternion(new_quat[3], new_quat[0], new_quat[1], new_quat[2]))
+        return True
+
 class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
     """A default frame listener, which takes care of basic mouse and keyboard
     input."""
 
-    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False, appStereoManager = None):
+    def __init__(self, renderWindow, camera, bufferedKeys = False, bufferedMouse = False, bufferedJoy = False):
         ogre.FrameListener.__init__(self)
         ogre.WindowEventListener.__init__(self)
         self.camera = camera
@@ -240,7 +334,6 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self.bufferedJoy = bufferedJoy
         self.shouldQuit = False # set to True to exit..
         self.MenuMode = False   # lets understand a simple menu function
-        self.appStereoManager = appStereoManager
 
         self.unittest = isUnitTest()
         self.unittest_duration = UnitTest_Duration()  # seconds before screen shot a exit
@@ -256,7 +349,7 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         self._registeredAnimStates = []
 
     def __del__ (self ):
-        ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
+        #ogre.WindowEventUtilities.removeWindowEventListener(self.renderWindow, self)
         self.windowClosed(self.renderWindow)
 
     def _inputSystemParameters (self ):
@@ -278,32 +371,6 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
         else:
             windowHnd = self.renderWindow.getCustomAttributeInt("WINDOW")
 
-        #
-        # Here is where we create the OIS input system using a helper function that takes python list of tuples
-        #
-        # t= self._inputSystemParameters()
-        # params = [("WINDOW",str(windowHnd))]
-        # params.extend(t)
-        # self.InputManager = OIS.createPythonInputSystem( params )
-
-        # #
-        # # an alternate way is to use a multimap which is exposed in ogre
-        # #
-        # #          pl = ogre.SettingsMultiMap()
-        # #          windowHndStr = str(windowHnd)
-        # #          pl.insert("WINDOW", windowHndStr)
-        # #          for  v in self._inputSystemParameters():
-        # #               pl.insert(v[0],v[1])
-        # #          im = OIS.InputManager.createInputSystem( pl )
-
-        # #Create all devices (We only catch joystick exceptions here, as, most people have Key/Mouse)
-        # self.Keyboard = self.InputManager.createInputObjectKeyboard( OIS.OISKeyboard, self.bufferedKeys )
-        # self.Mouse = self.InputManager.createInputObjectMouse( OIS.OISMouse, self.bufferedMouse )
-        # try:
-            # self.Joy = self.InputManager.createInputObjectJoyStick( OIS.OISJoyStick, self.bufferedJoy )
-        # except:
-            # self.Joy = False
-        #
         #Set initial mouse clipping size
         self.windowResized(self.renderWindow)
 
@@ -348,40 +415,6 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             if self.unittest_duration < 0:
                 self.renderWindow.writeContentsToFile(self.unittest_screenshot + '.jpg')
                 return False
-
-        # ##Need to capture/update each device - this will also trigger any listeners
-        # self.Keyboard.capture()
-        # self.Mouse.capture()
-        # buffJ = True
-        # if( self.Joy ):
-            # self.Joy.capture()
-            # buffJ = self.Joy.buffered()
-
-        # ##Check if one of the devices is not buffered
-        # if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ :
-            # ## one of the input modes is immediate, so setup what is needed for immediate movement
-            # if self.timeUntilNextToggle >= 0:
-                # self.timeUntilNextToggle -= evt.timeSinceLastFrame
-
-            # ## Move about 100 units per second
-            # self.moveScale = self.moveSpeed * evt.timeSinceLastFrame
-            # ## Take about 10 seconds for full rotation
-            # self.rotScale = self.rotateSpeed * evt.timeSinceLastFrame
-
-        # self.rotationX = ogre.Degree(0.0)
-        # self.rotationY = ogre.Degree(0.0)
-        # self.translateVector = ogre.Vector3().ZERO
-
-        # ##Check to see which device is not buffered, and handle it
-        # if not self.Keyboard.buffered():
-            # if  not self._processUnbufferedKeyInput(evt):
-                # return False
-        # if not self.Mouse.buffered():
-            # if not self._processUnbufferedMouseInput(evt):
-                # return False
-
-        # if not self.Mouse.buffered() or not self.Keyboard.buffered() or not buffJ:
-            # self._moveCamera()
 
         return True
 
@@ -515,38 +548,6 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
             Application.debugText = "P: %.3f %.3f %.3f O: %.3f %.3f %.3f %.3f"  \
                         % (pos.x,pos.y,pos.z, o.w,o.x,o.y,o.z)
 
-        if self.Keyboard.isKeyDown(OIS.KC_SUBTRACT) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() - self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
-        if self.Keyboard.isKeyDown(OIS.KC_ADD) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(self.appStereoManager.getEyesSpacing() + self.EYESSPACING_SPEED * frameEvent.timeSinceLastFrame)
-        if self.Keyboard.isKeyDown(OIS.KC_DIVIDE) and self.appStereoManager:
-            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() / math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
-        if self.Keyboard.isKeyDown(OIS.KC_MULTIPLY) and self.appStereoManager:
-            self.appStereoManager.setFocalLength(self.appStereoManager.getFocalLength() * math.pow(self.FOCALLENGTH_SPEED, frameEvent.timeSinceLastFrame))
-        if self.Keyboard.isKeyDown(OIS.KC_NUMPAD0) and self.appStereoManager:
-            self.appStereoManager.setEyesSpacing(0)
-        if self.Keyboard.isKeyDown(OIS.KC_DECIMAL) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.setFocalLengthInfinite(not self.appStereoManager.isFocalLengthInfinite())
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_0) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.toggleDebugPlane()
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_I) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            self.appStereoManager.saveConfig("stereo.cfg")
-            self.timeUntilNextToggle = 0.5
-        if self.Keyboard.isKeyDown(OIS.KC_U) and self.timeUntilNextToggle <= 0 and self.appStereoManager:
-            toggle_list = self.appStereoManager.mAvailableModes.keys()
-            mode = self.appStereoManager.getStereoMode()
-            new_ix = toggle_list.index(mode)+1
-            if new_ix == len(toggle_list): new_ix = 0
-            newMode = toggle_list[new_ix]
-            lViewport = self.appStereoManager.mLeftViewport
-            rViewport = self.appStereoManager.mRightViewport
-            self.appStereoManager.shutdown()
-            self.appStereoManager.init(lViewport, rViewport, newMode)
-            self.timeUntilNextToggle = 0.2
-
-        if self.appStereoManager: self.appStereoManager.updateDebugPlane()
         return True
 
     def _isToggleKeyDown(self, keyCode, toggleTime = 1.0):
@@ -606,11 +607,11 @@ class FrameListener(ogre.FrameListener, ogre.WindowEventListener):
 
 if __name__ == '__main__':
     import threading
-    ta = Application()
+    self = Application()
     def ogreFunc():
         try:
-            ta.fakeIt()
-            ta.go()
+            self.fakeInit() #Fake the initialization that would happen from a BCPy2000 application.
+            self.go()
         except ogre.OgreException, e:
             print e
     ogreThread = threading.Thread(target=ogreFunc)
