@@ -2,6 +2,7 @@ uniform float2 LensCentre;
 uniform float2 Scale;
 uniform float2 ScaleIn;
 uniform float4 HmdWarpParam;
+uniform float4 ChromAbParam;
 
 // Scales input texture coordinates for distortion.
 float2 HmdWarp(float2 in01)
@@ -12,10 +13,35 @@ float2 HmdWarp(float2 in01)
 	return LensCentre + Scale * rvector;
 }
 
-float4 main_fp(float4 pos : POSITION, float2 iTexCoord : TEXCOORD0, uniform sampler2D RT : register(s0)) : COLOR
+float4 main_fp(float4 pos : POSITION, 
+			   float2 iTexCoord : TEXCOORD0, 
+			   uniform sampler2D RT : register(s0)) : COLOR
 {
-	float2 tc = HmdWarp(iTexCoord);
-	return float4(tex2D(RT, tc).rgb,1);
+	float2 theta = (iTexCoord - LensCentre) * ScaleIn; // Scales to [-1, 1]
+	float rSq = theta.x * theta.x + theta.y * theta.y;
+	float2 theta1 = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq + HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);
+	float2 tc = LensCentre + Scale * theta1;
+
+	// Detect whether blue texture coordinates are out of range
+	// since these will scaled out the furthest.
+	float2 thetaBlue = theta1 * (ChromAbParam.z + ChromAbParam.w * rSq);
+	float2 tcBlue = LensCentre + Scale * thetaBlue;
+
+	//todo break out early here note the following lines are hlsl while the rest is in cg
+	//if (any(clamp(tcBlue, ScreenCenter -float2(0.25,0.5),
+	//ScreenCenter+float2(0.25, 0.5)) - tcBlue)
+
+	// Now do blue texture lookup.
+	float blue = tex2D(RT, tcBlue).b;
+	// Do green lookup (no scaling).
+	float2 tcGreen = LensCentre + Scale * theta1;
+	float green = tex2D(RT, tcGreen).g;
+	// Do red scale and lookup.
+	float2 thetaRed = theta1 * (ChromAbParam.x + ChromAbParam.y * rSq);
+	float2 tcRed = LensCentre + Scale * thetaRed;
+	float red = tex2D(RT, tcRed).r;
+
+	return float4(red, green, blue ,1);
 }
 
 void oculusBaseLightMap_vp(float4 position : POSITION,

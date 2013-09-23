@@ -200,6 +200,8 @@ class Application(object):
             pParams = [mat.getTechnique(0).getPass(0).getFragmentProgramParameters() for mat in mats]
             self.compositors = []
             scaleFactor = 1.0 / rift_info['distortion_scale']
+            my_chrom_ab = rift_info['chrom_ab']
+            my_chrom_ab = ogre.Vector4(my_chrom_ab[0], my_chrom_ab[1], my_chrom_ab[2], my_chrom_ab[3])
             for ix in range(2):
                 pParam = pParams[ix]
 #                pPostProcessShader->SetUniform2f("LensCenter",
@@ -216,6 +218,7 @@ class Application(object):
                 #pParam.setNamedConstant("Scale", 0.25*scaleFactor) #(w/2) * scaleFactor, (h/2) * scaleFactor * as = 0.25*scaleFactor, 0.5*scaleFactor*my_asp
                 #pParam.setNamedConstant("ScaleIn", 4.0) #2/w, (2/h)/as = 4, 2/my_asp
                 pParam.setNamedConstant("HmdWarpParam", hmdwarp)
+                pParam.setNamedConstant("ChromAbParam", my_chrom_ab)
                 
                 self.compositors.append(ogre.CompositorManager.getSingleton().addCompositor(self.viewPorts[ix], "OculusLeft" if ix==0 else "OculusRight"))
                 self.compositors[ix].setEnabled(True)
@@ -283,9 +286,6 @@ class Application(object):
         #self.frameListener.showDebugOverlay(True)
         self.frameListener.showDebugOverlay(False)
         self.root.addFrameListener(self.frameListener)
-        if DOHMD:
-            self.oculusFrameListener = OculusFrameListener(self.oculus, self.camera)
-            self.root.addFrameListener(self.oculusFrameListener)
 
     def startRenderLoop(self):
         self.root.startRendering()
@@ -295,17 +295,6 @@ class Application(object):
         self.root.shutdown()
         del self.root
         
-class OculusFrameListener(ogre.FrameListener):
-    def __init__(self, oculus, camera):
-        ogre.FrameListener.__init__(self)
-        #need reference to the camera nodes
-        #need reference to oculus
-
-    def frameRenderingQueued ( self, evt ):
-        #new_orient = oculus.rot_quat
-        #cameraNode.setOrientation(new_orient)
-        return True
-
 class HMDFrameListener(ogre.FrameListener):
     def __init__(self, hmd, cameraNode):
         ogre.FrameListener.__init__(self)
