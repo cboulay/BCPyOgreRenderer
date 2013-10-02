@@ -4,8 +4,7 @@ import os.path
 import ogre.renderer.OGRE as ogre
 import ogre.io.OIS as OIS
 import math
-
-DOHMD = True #Use Head-Mounted Display
+import ctypes
 
 def getPluginPath():
     """ Return the absolute path to a valid plugins.cfg file.
@@ -184,13 +183,13 @@ class Application(object):
                 self.cameraNode.attachObject(self.cameras[ix])
                 self.cameras[ix].setNearClipDistance(my_znear)
                 self.cameras[ix].setFarClipDistance(my_zfar)
-                self.cameras[ix].setPosition((ix*2-1) * my_ipd * 0.5, 0, 0)
+                self.cameras[ix].setPosition((ix*2-1) * my_ipd * 0.5, 0.075, 0.045)
                 self.cameras[ix].setAspectRatio(my_asp)
                 self.cameras[ix].setFOVy(my_fovy)
-                #proj = ogre.Matrix4(ogre.Quaternion())
-                #proj.setTrans(ogre.Vector3(-my_pco * (2 * ix - 1), 0, 0)) #adjust for lens centers
-                #self.cameras[ix].setCustomProjectionMatrix(True, proj * self.cameras[ix].getProjectionMatrix())
-                self.cameras[ix].setCustomProjectionMatrix(True, my_proj[ix])
+                proj = ogre.Matrix4(ogre.Quaternion())
+                proj.setTrans(ogre.Vector3(-my_pco * (2 * ix - 1), 0, 0)) #adjust for lens centers
+                self.cameras[ix].setCustomProjectionMatrix(True, proj * self.cameras[ix].getProjectionMatrix())
+                #self.cameras[ix].setCustomProjectionMatrix(True, my_proj[ix])
                 
             #Set the barrel distortion compensation.
             my_distortion = rift_info['distortion'] if True else [1.0, 0.22, 0.24, 0]
@@ -204,22 +203,14 @@ class Application(object):
             my_chrom_ab = ogre.Vector4(my_chrom_ab[0], my_chrom_ab[1], my_chrom_ab[2], my_chrom_ab[3])
             for ix in range(2):
                 pParam = pParams[ix]
-#                pPostProcessShader->SetUniform2f("LensCenter",
-#                                                 x + (w + Distortion.XCenterOffset * 0.5f)*0.5f, y + h*0.5f);
-#                pPostProcessShader->SetUniform2f("ScreenCenter", x + w*0.5f, y + h*0.5f);
-#                // MA: This is more correct but we would need higher-res texture vertically; we should adopt this
-#                // once we have asymmetric input texture scale.
-#                float scaleFactor = 1.0f / Distortion.Scale;
-#                pPostProcessShader->SetUniform2f("Scale",   (w/2) * scaleFactor, (h/2) * scaleFactor * as);
-#                pPostProcessShader->SetUniform2f("ScaleIn", (2/w),               (2/h) / as);
-#                pPostProcessShader->SetUniform4f("HmdWarpParam",
-#                                                 Distortion.K[0], Distortion.K[1], Distortion.K[2], Distortion.K[3]);
                 pParam.setNamedConstant("LensCentre", 0.5 + ((1-2*ix)*my_pco)*0.5) #x + (w + Distortion.XCenterOffset * 0.5f)*0.5f, y+h*0.5f
-                #pParam.setNamedConstant("Scale", 0.25*scaleFactor) #(w/2) * scaleFactor, (h/2) * scaleFactor * as = 0.25*scaleFactor, 0.5*scaleFactor*my_asp
-                #pParam.setNamedConstant("ScaleIn", 4.0) #2/w, (2/h)/as = 4, 2/my_asp
                 pParam.setNamedConstant("HmdWarpParam", hmdwarp)
                 pParam.setNamedConstant("ChromAbParam", my_chrom_ab)
-                
+                aspr = self.cameras[ix].getAspectRatio()
+                scaleIn = (ctypes.c_float*2)(*[2.0, 2.0/aspr])
+                pParam.setNamedConstantFloat("ScaleIn", ctypes.addressof(scaleIn), 1)
+                scale = (ctypes.c_float*2)(*[0.5*scaleFactor, 0.5*scaleFactor*aspr])
+                pParam.setNamedConstantFloat("Scale", ctypes.addressof(scale), 1)
                 self.compositors.append(ogre.CompositorManager.getSingleton().addCompositor(self.viewPorts[ix], "OculusLeft" if ix==0 else "OculusRight"))
                 self.compositors[ix].setEnabled(True)
             comp = ogre.CompositorManager.getSingleton().getByName("OculusRight")

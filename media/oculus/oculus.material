@@ -10,6 +10,7 @@ fragment_program Ogre/Compositor/OculusFP_cg cg
 		param_named Scale float2 0.3 0.23329
 		param_named ScaleIn float2 2 2.5
 		param_named HmdWarpParam float4 1.0f, 0.22f, 0.24f, 0
+		param_named ChromAbParam float4 0.996f -0.004f, 1.014f, 0
 	}
 }
 
