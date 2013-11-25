@@ -1,0 +1,107 @@
+<scene exported_by="貴晴" previous_export_time="1384414775.907054" formatVersion="1.0.1" export_time="1385369380.029424" >
+  <nodes >
+    <node name="Armature" >
+      <position z="-0.000000" x="0.000000" y="0.000000" />
+      <rotation qz="-0.000000" qx="0.000000" qy="0.000000" qw="1.000000" />
+      <scale z="1.000000" x="1.000000" y="1.000000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <node name="hand_mesh" >
+        <position z="-0.000000" x="0.000000" y="0.000000" />
+        <rotation qz="-0.000000" qx="0.000000" qy="0.000000" qw="1.000000" />
+        <scale z="1.000000" x="1.000000" y="1.000000" />
+        <game >
+          <sensors />
+          <actuators />
+        </game>
+        <entity friction_z="1.0" mass_radius="1.0" friction_x="1.0" velocity_min="0.0" name="hand" physics_type="STATIC" damping_trans="0.03999999910593033" damping_rot="0.10000000149011612" lock_trans_y="False" anisotropic_friction="False" meshFile="hand.mesh" mass="1.0" actor="False" inertia_tensor="0.4000000059604645" friction_y="1.0" lock_rot_z="False" lock_rot_y="False" lock_rot_x="False" lock_trans_x="False" velocity_max="0.0" lock_trans_z="False" ghost="False" />
+      </node>
+    </node>
+    <node name="Lamp" >
+      <position z="7.030536" x="1.460100" y="14.760715" />
+      <rotation qz="0.097887" qx="-0.032255" qy="0.555079" qw="0.825388" />
+      <scale z="1.000000" x="1.000000" y="1.000000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <light shadow="true" powerScale="3.0" type="directional" name="Lamp" >
+        <position z="7.030536" x="1.460100" y="14.760715" />
+        <lightAttenuation range="5000" quadratic="0.0" linear="0.03333335240683057" constant="1.0" />
+        <direction z="-0.162" x="-0.126" y="-0.979" />
+        <colourDiffuse r="1.0" b="1.0" g="1.0" />
+        <colourSpecular r="1.0" b="1.0" g="1.0" />
+        <colourShadow r="1.0" b="1.0" g="1.0" />
+      </light>
+    </node>
+    <node name="Camera" >
+      <position z="-17.772310" x="30.143047" y="2.813429" />
+      <rotation qz="-0.676112" qx="0.207059" qy="0.676111" qw="0.207059" />
+      <scale z="1.000435" x="1.000296" y="1.000260" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <camera projectionType="perspective" fov="0.5033799435163735" name="Camera" >
+        <clipping farPlaneDist="100.0" near="0.10000000149011612" nearPlaneDist="0.10000000149011612" far="100.0" />
+      </camera>
+    </node>
+  </nodes>
+  <externals >
+    <item type="material" >
+      <file name="C:\blender image files\hand body\skin.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\blackness.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Sweater.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\trousers.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Sweater.001.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\trousers.001.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Belt.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Belt01.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\skin.001.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\blackness.001.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Sweater.002.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\trousers.002.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\skin.002.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\blackness.002.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\Sweater.003.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\hand body\trousers.003.material" />
+    </item>
+  </externals>
+  <environment >
+    <colourDiffuse r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+    <colourAmbient r="0.0" b="0.0" g="0.0" />
+    <colourBackground r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+  </environment>
+</scene>

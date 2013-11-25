@@ -1,0 +1,61 @@
+<scene export_time="1385281252.028416" exported_by="貴晴" formatVersion="1.0.1" previous_export_time="1385280580.53895" >
+  <nodes >
+    <node name="Table" >
+      <position x="0.000000" y="0.000000" z="-0.000000" />
+      <rotation qz="-0.000000" qx="0.707107" qy="0.000000" qw="0.707107" />
+      <scale x="0.030000" y="0.030000" z="0.030000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <entity damping_trans="0.03999999910593033" lock_rot_y="False" ghost="False" velocity_min="0.0" damping_rot="0.10000000149011612" mass_radius="1.0" friction_y="1.0" lock_trans_x="False" lock_trans_y="False" lock_trans_z="False" lock_rot_x="False" inertia_tensor="0.4000000059604645" name="Table" velocity_max="0.0" friction_z="1.0" friction_x="1.0" mass="1.0" physics_type="STATIC" anisotropic_friction="False" actor="False" meshFile="Table.mesh" lock_rot_z="False" />
+    </node>
+    <node name="Lamp" >
+      <position x="4.076245" y="5.903862" z="-1.005454" />
+      <rotation qz="-0.272171" qx="0.169076" qy="0.755880" qw="0.570947" />
+      <scale x="1.000000" y="1.000000" z="1.000000" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <light shadow="true" name="Lamp" powerScale="1.0" type="point" >
+        <position x="4.076245" y="5.903862" z="-1.005454" />
+        <lightAttenuation linear="0.03333335240683057" constant="1.0" quadratic="0.0" range="5000" />
+        <colourDiffuse r="1.0" b="1.0" g="1.0" />
+        <colourSpecular r="1.0" b="1.0" g="1.0" />
+        <colourShadow r="1.0" b="1.0" g="1.0" />
+      </light>
+    </node>
+    <node name="Camera" >
+      <position x="-10.155818" y="10.599002" z="-1.408806" />
+      <rotation qz="0.279141" qx="0.247615" qy="-0.694066" qw="0.615661" />
+      <scale x="0.999987" y="0.999987" z="1.000001" />
+      <game >
+        <sensors />
+        <actuators />
+      </game>
+      <camera name="Camera" fov="0.5033799435163735" projectionType="perspective" >
+        <clipping farPlaneDist="100.0" nearPlaneDist="0.10000000149011612" near="0.10000000149011612" far="100.0" />
+      </camera>
+    </node>
+  </nodes>
+  <externals >
+    <item type="material" >
+      <file name="C:\blender image files\short desk\Chrome_Med_Ref.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\short desk\Wood_Mix.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\short desk\BLACK_MATTE.material" />
+    </item>
+    <item type="material" >
+      <file name="C:\blender image files\short desk\WHITE_PLSTC.material" />
+    </item>
+  </externals>
+  <environment >
+    <colourAmbient r="0.0" b="0.0" g="0.0" />
+    <colourBackground r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+    <colourDiffuse r="0.05087608844041824" b="0.05087608844041824" g="0.05087608844041824" />
+  </environment>
+</scene>
