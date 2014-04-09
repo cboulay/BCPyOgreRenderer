@@ -52,7 +52,7 @@ This is not true for `z`. i.e., `hand.z = 10` is not equivalent to `hand.obj.z =
 ### Virtual Hand
 
 One reason for using a 3D engine is that I would like to use BCPy2000 to control the animation of a virtual hand.
-I am using [libhand](www.libhand.org). It comes with an OGRE model that is compatible with Ogre 1.7.1 (linked above).
+I am using [libhand](http://www.libhand.org). It comes with an OGRE model that is compatible with Ogre 1.7.1 (linked above).
 If for some reason you use a different Ogre version, you may use the Blender model, then [export it](https://code.google.com/p/blender2ogre/)
 to a generic OGRE .xml, then converted it to the correct version using the [tools](http://sourceforge.net/projects/ogre/files/ogre-tools/) for your version of Ogre.
 
