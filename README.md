@@ -1,21 +1,39 @@
 BCPyOgreRenderer
 =================
 
-This is a drop-in replacement renderer for [BCPy2000](http://bci2000.org/downloads/BCPy2000/Renderers.html)
+BCPyOgreRenderer is a drop-in replacement renderer for [BCPy2000](http://bci2000.org/downloads/BCPy2000/Renderers.html)
 using the [OGRE3D](http://www.ogre3d.org/) engine with its [Python-Ogre](http://www.python-ogre.org/) bindings.
-There are still many things to fix.
+This is only meant as a temporary way to get easy access to a 3D engine in BCI2000. Other methods are being developed and will surpass this.
+
+## Important Note
+
+Since I am now using an older Python-Ogre, the models included with this repo are too new and no longer work. They must be re-exported from Blender for the correct version.
 
 ## Installation
 
-My [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys) implementation of BCPy2000 requires Python 2.6.
-Therefore, this uses [pre-built python-ogre](http://sourceforge.net/projects/python-ogre/files/Latest/1.7.1/ogre-1.7.1-r1125.7z/download) compatible with Python 2.6.
-[Install instructions](http://www.cse.unr.edu/~sushil/class/381/ware/pythonOgreWin7Install.pdf).
-(If you already installed BCPy2000 then you can skip steps 1-3).
+At first I intended this to be used with [BCPyElectrophys](https://github.com/cboulay/BCPyElectrophys).
+However, since my approach to using a 3D engine will change soon, I am dissociating the two and am no longer concerned with keeping their Python versions compatible.
 
-Download this repo and put it somewhere convenient. Edit your plugins.cfg and resources.cfg file
-so they point to where your resources are stored. Edit test.bat to point to your BCI2000 files.
+If you have not already done so, please install BCI2000 and BCPy2000. See InstallBCPy2000.txt in this repository.
 
-Run `test.bat` to try it out.
+1. Clone this repository.
+	- If you would like to use a GUI-based Git client, I suggest [SourceTree](http://www.sourcetreeapp.com/).
+2. Copy this repository's root folder to be a sister directory to your BCI2000 production folder. e.g.,
+	- C:\BCI2000\dev
+	- C:\BCI2000\prod
+	- C:\BCI2000\FullMonty254-2011-710
+	- C:\BCI2000\BCPyOgreRenderer
+3. Edit the plugins.cfg.<os> (<os> is nt on Windows) file to point to the directory where Python-Ogre's plugins folder is.
+	- Note that the directory is relative to ???.
+4. Edit the resources.cfg file to point to the media you will use (3D objects, materials, etc.)
+	- Note that the directory is relative to the PythonAppWD (working directory)
+5. Edit test_dropin.bat
+	- The top two lines point to the location of the BCI2000 prog directory, relative to the location of test_drop.bat
+	- Line 9, PythonAppClassFile points to the location, relative to the BCI2000 prog directory, of the BCPy2000 application file.
+	- Line 9, PythonAppWD points to the location, relative to the BCI2000 prog directory, where all your support files are.
+		- This is also the location that plugins.cfg and resources.cfg start in to search for their respective items.
+		
+Run `test_dropin.bat` to try it out.
 
 ## Notes
 

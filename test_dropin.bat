@@ -1,11 +1,12 @@
-#! ../../BCI2000/prog/BCI2000Shell
-@cls & ..\..\BCI2000\prog\BCI2000Shell %0 %* #! && exit /b 0 || exit /b 1\n
+#! ../prod/prog/BCI2000Shell
+@cls & ..\prod\prog\BCI2000Shell %0 %* #! && exit /b 0 || exit /b 1\n
 Change directory $BCI2000LAUNCHDIR
+execute script ..\batch\FindPortablePython.bat  # this is necessary so that BCI2000 can find Python
 Show window; Set title ${Extract file base $0}
 Reset system
 Startup system localhost
-Start executable SignalGenerator --local --FileFormat=Null
+Start executable SignalGenerator --local
 Start executable SpectralSignalProcessing --local
-Start executable PythonApplication --local --PythonAppClassFile=..\..\BCPyElectrophys\BCPyOgreRenderer\TemplateApplication.py --PythonAppWD=..\..\BCPyElectrophys
+Start executable PythonApplication --local --PythonAppClassFile=..\..\BCPyOgreRenderer\TemplateApplication.py --PythonAppWD=..\..\BCPyOgreRenderer
 Wait for Connected
-Load parameterfile "../../BCPyElectrophys/test.prm"
+Load parameterfile "../../BCPyOgreRenderer/test_dropin.prm"

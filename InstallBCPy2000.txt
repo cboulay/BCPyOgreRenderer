@@ -1,0 +1,20 @@
+	1. Download Python
+		a. Python can be downloaded and installed several ways, but BCPy2000 is currently highly dependent on Python version and package versions. I had success with Python 2.6, and Jez is/was working on 2.7, but a more robust solution is forthcoming and therefore it is not worth struggling to get Python 2.6 or Python 2.7 working with BCPy2000 right now.
+		b. Thus, your best/only bet is to download Jez's "Full Monty" http://bci2000.org/downloads/BCPy2000/Download.html
+	2. Install Python
+		a. From the Full Monty download, extract the folder named FullMonty254-20110710 as a sister directory to your BCI2000 production folder.
+			- C:\BCI2000\prod
+			- C:\BCI2000\FullMonty254-20110710
+	3. Put the BCPy2000 framework files into your Python installation.
+		a. Open a command-prompt.
+		b. Check the PYTHONHOME environment variable.
+			i. Type "SET PYTHONHOME" and hit enter to see if that variable is set.
+			ii. If not, then set it now. e.g., 
+			SET PYTHONHOME=C:\BCI2000\FullMonty254-20110710\App
+		c. Check that python is on the path.
+			i. where python.exe
+			ii. If it cannot find it, then do SET PATH=C:\BCI2000\FullMonty254-20110710\App;%PATH%
+		d. cd C:\BCI2000\dev\trunk\src\contrib\BCPy200\framework
+		e. python setup.py install
+	4. Test it out!
+		a. Run C:\BCI2000\prod\batch\PythonDemo1_Triangle.bat

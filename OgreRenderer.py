@@ -118,8 +118,8 @@ class OgreRenderer(BciGenericRenderer):
         self.thread.setDaemon(True) #Not sure if necessary
         self.thread.start() #Kicks off the run().
         msg = self.ogreQ.get(True, None)#Block progression, with no timeout, until the OgreThread posts it is ready to render
-        self.coordinate_mapping = self._coordinate_mapping
         self.color = self._bgcolor
+        self.coordinate_mapping = self._coordinate_mapping
 
     def GetFrameRate(self):
         if 'FramesPerSecond' in self._bci.estimated:
@@ -176,51 +176,51 @@ class OgreRenderer(BciGenericRenderer):
             return self.app.viewPorts[0].getActualHeight()
         else:
             return self.app.viewPort.getActualHeight()
-
-    @property
-    def bgcolor(self):
-        """Color of viewPort.BackgroundColour"""
-        return self._bgcolor
-    @bgcolor.setter
-    def bgcolor(self, value):
-        self._bgcolor = value
-        if self.app.hmd:
-            for vp in self.app.viewPorts:
-                vp.setBackgroundColour(self._bgcolor)
-        else:
-            self.app.viewPort.setBackgroundColour(self._bgcolor)
+    @apply
+    def bgcolor():
+        def fget(self):
+            return self._bgcolor
+        def fset(self, value):
+            self._bgcolor = value
+            if self.app.hmd:
+                for vp in self.app.viewPorts:
+                    vp.setBackgroundColour(self._bgcolor)
+            else:
+                self.app.viewPort.setBackgroundColour(self._bgcolor)
+        return property(fget, fset, doc='Color of viewPort.BackgroundColour')
     color=bgcolor
 
-    @property
-    def coordinate_mapping(self):
-        return self._coordinate_mapping
-    @coordinate_mapping.setter
-    def coordinate_mapping(self, value):
-        #zpos = self.app.camera.getPosition()[2]
-        zpos = 0.0
-        cm = value.lower().replace('bottom', 'lower').replace('top', 'upper').replace(' ', '')
-        scrw,scrh = self.size
-        longd = max((scrw,scrh))
-        if cm == 'pixelsfromlowerleft': #VisionEgg default
-            self.app.camera.setPosition( ogre.Vector3(scrw/2, scrh/2, zpos) )
-            #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
-            self.app.light.setPosition ( ogre.Vector3(scrw, scrh, longd) )
-        elif cm == 'pixelsfromupperleft': #PygameRenderer default
-            self.app.camera.setPosition( ogre.Vector3(scrw/2, -scrh/2, zpos) )
-            #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
-            self.app.light.setPosition ( ogre.Vector3(scrw, -scrh, longd) )
-        elif cm == 'pixelsfromcenter': #OgreRenderer default
-            if self.app.hmd:
-                pass
-                #for cam in self.app.cameras:
-                #    cam.setPosition(ogre.Vector3(0, 0, zpos))
+    @apply
+    def coordinate_mapping():
+        def fget(self):
+            return self._coordinate_mapping
+        def fset(self, value):
+            #zpos = self.app.camera.getPosition()[2]
+            zpos = 0.0
+            cm = value.lower().replace('bottom', 'lower').replace('top', 'upper').replace(' ', '')
+            scrw,scrh = self.size
+            longd = max((scrw,scrh))
+            if cm == 'pixelsfromlowerleft': #VisionEgg default
+                self.app.camera.setPosition( ogre.Vector3(scrw/2, scrh/2, zpos) )
+                #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, scrh/2 + 80, -longd/10.0) )
+                self.app.light.setPosition ( ogre.Vector3(scrw, scrh, longd) )
+            elif cm == 'pixelsfromupperleft': #PygameRenderer default
+                self.app.camera.setPosition( ogre.Vector3(scrw/2, -scrh/2, zpos) )
+                #self.light.setPosition ( ogre.Vector3(-scrw/2 - 20, -scrh/2 + 80, -longd/10.0) )
+                self.app.light.setPosition ( ogre.Vector3(scrw, -scrh, longd) )
+            elif cm == 'pixelsfromcenter': #OgreRenderer default
+                if self.app.hmd:
+                    pass
+                    #for cam in self.app.cameras:
+                    #    cam.setPosition(ogre.Vector3(0, 0, zpos))
+                else:
+                    self.app.camera.setPosition( ogre.Vector3(0, 0, zpos) )
+                #self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
+                #self.app.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
             else:
-                self.app.camera.setPosition( ogre.Vector3(0, 0, zpos) )
-            #self.light.setPosition ( ogre.Vector3(20, 80, -longd/10.0) )
-            #self.app.light.setPosition ( ogre.Vector3(scrw/2, scrh/2, longd/5.0) )
-        else:
-            raise ValueError('coordinate_mapping "%s" is unsupported' % value)
-        self._coordinate_mapping = value
+                raise ValueError('coordinate_mapping "%s" is unsupported' % value)
+            self._coordinate_mapping = value
+        return property(fget, fset)
 
 BciGenericRenderer.subclass = OgreRenderer
 
@@ -238,157 +238,173 @@ class OgreStimulus(Coords.Box):
         if color: self.color = color
         self.on = on
 
-    @property
-    def size(self):
-        #Subclass should overshadow this to get the real size from the object and set the internal size
-        return Coords.Box.size.fget(self)
-    @size.setter
-    def size(self, value):
-        value = tuple(value)
-        while len(value)<3: value = value + (None,) #Fill out til it's 3D
-        value = tuple([x if x else 1.0 for x in value])#Replace None's with 1's
-        super(OgreStimulus, self.__class__).size.fset(self, value)
-        self.reset()
-    @property
-    def width(self):
-        return self.size.x #Returns updated representation
-    @width.setter
-    def width(self, value):
-        super(OgreStimulus, self.__class__).width.fset(self, value)
-        self.reset()
-    @property
-    def height(self):
-        return self.size.y
-    @height.setter
-    def height(self, value):
-        super(OgreStimulus, self.__class__).height.fset(self, value)
-        self.reset()
-    @property
-    def depth(self):
-        return self.size.z
-    @depth.setter
-    def depth(self, value):
-        super(OgreStimulus, self.__class__).depth.fset(self, value)
-        self.reset()
+    @apply
+    def size():
+        def fget(self):
+            #Subclass should overshadow this to get the real size from the object and set the internal size
+            return Coords.Box.size.fget(self)
+        def fset(self, value):
+            value = tuple(value)
+            while len(value)<3: value = value + (None,) #Fill out til it's 3D
+            value = tuple([x if x else 1.0 for x in value])#Replace None's with 1's
+            super(OgreStimulus, self.__class__).size.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def width():
+        def fget(self):
+            return self.size.x #Returns updated representation
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).width.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def height():
+        def fget(self):
+            return self.size.y
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).height.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def depth():
+        def fget(self):
+            return self.size.z
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).depth.fset(self, value)
+            self.reset()
+        return property(fget, fset)
     def scale(self, value):
         if not isinstance(value, (tuple,list)): value = tuple([value])
         while len(value)<3: value = value + (value[-1], )
         self.size = self.size * value
 
-    @property
-    def position(self):
-        #Subclass should overshadow this to get the real position and set the internal variable
-        return super(OgreStimulus, self).position
-    @position.setter
-    def position(self, value):
-        #Account for None in value
-        currAnchPos = self.position
-        newAnchPos = [new if new else old for new,old in zip(value,currAnchPos)]
-        super(OgreStimulus, self.__class__).position.fset(self, newAnchPos)
-        self.reset()
-    @property
-    def x(self):
-        return self.position.x #This updates __position with the true position.
-    @x.setter
-    def x(self, value):
-        super(OgreStimulus, self.__class__).x.fset(self, value)
-        self.reset()
-    @property
-    def y(self):
-        return self.position.y #This updates __position with the true position.
-    @y.setter
-    def y(self, value):
-        super(OgreStimulus, self.__class__).y.fset(self, value)
-        self.reset()
-    @property
-    def z(self):
-        return self.position.z #This updates __position with the true position.
-    @z.setter
-    def z(self, value):
-        super(OgreStimulus, self.__class__).z.fset(self, value)
-        self.reset()
+    @apply
+    def position():
+        def fget(self):
+            #Subclass should overshadow this to get the real position and set the internal variable
+            return super(OgreStimulus, self).position
+        def fset(self, value):
+            #Account for None in value
+            currAnchPos = self.position
+            newAnchPos = [new if new else old for new,old in zip(value,currAnchPos)]
+            super(OgreStimulus, self.__class__).position.fset(self, newAnchPos)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def x():
+        def fget(self):
+            return self.position.x #This updates __position with the true position.
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).x.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def y():
+        def fget(self):
+            return self.position.y #This updates __position with the true position.
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).y.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def z():
+        def fget(self):
+            return self.position.z #This updates __position with the true position.
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).z.fset(self, value)
+            self.reset()
+        return property(fget, fset)
 
     #Others: lims,rect,left,right,top,bottom,near,far
-    @property
-    def lims(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).lims
-    @lims.setter
-    def lims(self, value):
-        super(OgreStimulus, self.__class__).lims.fset(self, value)
-        self.reset()
-    @property
-    def rect(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).rect
-    @rect.setter
-    def rect(self, value):
-        super(OgreStimulus, self.__class__).rect.fset(self, value)
-        self.reset()
-    @property
-    def left(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).left
-    @left.setter
-    def left(self, value):
-        super(OgreStimulus, self.__class__).left.fset(self, value)
-        self.reset()
-    @property
-    def right(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).right
-    @right.setter
-    def right(self, value):
-        super(OgreStimulus, self.__class__).right.fset(self, value)
-        self.reset()
-    @property
-    def top(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).top
-    @top.setter
-    def top(self, value):
-        super(OgreStimulus, self.__class__).top.fset(self, value)
-        self.reset()
-    @property
-    def bottom(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).bottom
-    @bottom.setter
-    def bottom(self, value):
-        super(OgreStimulus, self.__class__).bottom.fset(self, value)
-        self.reset()
-    @property
-    def near(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).near
-    @near.setter
-    def near(self, value):
-        super(OgreStimulus, self.__class__).near.fset(self, value)
-        self.reset()
-    @property
-    def far(self):
-        self.position
-        self.size
-        return super(OgreStimulus, self).far
-    @far.setter
-    def far(self, value):
-        super(OgreStimulus, self.__class__).far.fset(self, value)
-        self.reset()
-
-    @property
-    def anchor(self):
-        return super(OgreStimulus, self).anchor
-    @anchor.setter
-    def anchor(self, value):
-        super(OgreStimulus, self.__class__).anchor.fset(self, value)
-        self.reset()
+    @apply
+    def lims():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).lims
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).lims.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def rect():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).rect
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).rect.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def left():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).left
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).left.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def right():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).right
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).right.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def top():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).top
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).top.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def bottom():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).bottom
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).bottom.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def near():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).near
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).near.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def far():
+        def fget(self):
+            self.position
+            self.size
+            return super(OgreStimulus, self).far
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).far.fset(self, value)
+            self.reset()
+        return property(fget, fset)
+    @apply
+    def anchor():
+        def fget(self):
+            return super(OgreStimulus, self).anchor
+        def fset(self, value):
+            super(OgreStimulus, self.__class__).anchor.fset(self, value)
+            self.reset()
+        return property(fget, fset)
 
 class EntityStimulusAnimFrameListener(ogre.FrameListener):
     def __init__(self, entity):
@@ -503,14 +519,14 @@ class EntityStimulus():
 #    def position(self,value):
 #        super(EntityStimulus, self.__class__).position.fset(self, value)
 #
-    @property
-    def on(self):
-        """Hidden or not"""
-        return self.entity.isVisible()
-    @on.setter
-    def on(self, value):
-        self.entity.setVisible(value)
-#
+    @apply
+    def on():
+        def fget(self):
+            #"""Hidden or not"""
+            return self.entity.isVisible()
+        def fset(self, value):
+            self.entity.setVisible(value)
+        return property(fget, fset)
 #    @property
 #    def color(self):
 #        """Color"""
@@ -644,13 +660,14 @@ class Disc(PrefabStimulus):
         PrefabStimulus.__init__(self, pttype="sphere", **kwargs)
         #Default size is 100,100,100
 
-    @property
-    def radius(self):
-        """Sphere radius."""
-        return self.width/2.0
-    @radius.setter
-    def radius(self, value):
-        self.size = (value*2.0, value*2.0, value*2.0)
+    @apply
+    def radius():
+        #"""Sphere radius."""
+        def fget(self):
+            return self.width/2.0
+        def fset(self, value):
+            self.size = (value*2.0, value*2.0, value*2.0)
+        return (fget, fset)
 
 class Block(PrefabStimulus):
     """
@@ -660,13 +677,14 @@ class Block(PrefabStimulus):
         PrefabStimulus.__init__(self, pttype="cube", **kwargs)
         #default size is 102,102,102
 
-    @property
-    def testprop(self):
-        print "testprop getter"
-        return 0
-    @testprop.setter
-    def testprop(self):
-        print "testprop setter"
+    @apply
+    def testprop():
+        def fget(self):
+            print "testprop getter"
+            return 0
+        def fset(self, value):
+            print "testprop setter"
+        return (fget, fset)
 
     def get_getset(self):
         print "getset getter"
@@ -843,70 +861,77 @@ class Text(OgreStimulus):
         self.panel.setDimensions(desiredScale[0],desiredScale[1])
         self.panel.setPosition(panL,panT)
 
-    @property
-    def size(self):
-        trueSize = (self.panel.getHeight(), self.panel.getWidth(), 0)
-        if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
-            trueSize = self.__original_size
-        Coords.Box.size.fset(self, trueSize)
-        return super(Text, self).size
-    @size.setter
-    def size(self,value):
-        super(Text, self.__class__).size.fset(self, value)
+    @apply
+    def size():
+        def fget(self):
+            trueSize = (self.panel.getHeight(), self.panel.getWidth(), 0)
+            if trueSize[0]==0 and trueSize[1]==0 and trueSize[2]==0: #Not yet in the world.
+                trueSize = self.__original_size
+            Coords.Box.size.fset(self, trueSize)
+            return super(Text, self).size
+        def fset(self,value):
+            super(Text, self.__class__).size.fset(self, value)
+        return property(fget, fset)
 
-    @property
-    def position(self):
-        t,l,w,h = self.panel.getTop(), self.panel.getLeft(), self.panel.getHeight(), self.panel.getWidth()
-        a = self.anchor
-        aX = l + (a[0]+1)*w/2
-        aY = t + (1-a[1])*h/2
-        Coords.Box.position.fset(self, (aX,aY,0))
-        return super(Text, self).position
-    @position.setter
-    def position(self,value):
-        value = tuple(value)
-        while len(value)<3: value = value + (None,)
-        super(Text, self.__class__).position.fset(self, value)
+    @apply
+    def position():
+        def fget(self):
+            t,l,w,h = self.panel.getTop(), self.panel.getLeft(), self.panel.getHeight(), self.panel.getWidth()
+            a = self.anchor
+            aX = l + (a[0]+1)*w/2
+            aY = t + (1-a[1])*h/2
+            Coords.Box.position.fset(self, (aX,aY,0))
+            return super(Text, self).position
+        def fset(self,value):
+            value = tuple(value)
+            while len(value)<3: value = value + (None,)
+            super(Text, self.__class__).position.fset(self, value)
+        return property(fget, fset)
 
-    @property
-    def color(self):
-        """Text color"""
-        col = self.textArea.getColourTop()
-        return (col.r, col.g, col.b, col.a)
-    @color.setter
-    def color(self, value):
-        self.textArea.setColourTop( ogre.ColourValue(*value) )
-        self.textArea.setColourBottom( ogre.ColourValue(*value) )
+    @apply
+    def color():
+        #"""Text color"""
+        def fget(self):
+            col = self.textArea.getColourTop()
+            return (col.r, col.g, col.b, col.a)
+        def fset(self, value):
+            self.textArea.setColourTop( ogre.ColourValue(*value) )
+            self.textArea.setColourBottom( ogre.ColourValue(*value) )
+        return property(fget, fset)
 
-    @property
-    def text(self):
-        """Text"""
-        return self.textArea.getCaption()
-    @text.setter
-    def text(self, text):
-        self.textArea.setCaption(text)
+    @apply
+    def text():
+        #"""Text"""
+        def fget(self):
+            return self.textArea.getCaption()
+        def fset(self, text):
+            self.textArea.setCaption(text)
+        return property(fget, fset)
+        
+    @apply
+    def font_size():
+        #"""Font Size"""
+        def fget(self):
+            return self.textArea.getCharHeight()
+        def fset(self, value):
+            self.textArea.setCharHeight(value)
+        return property(fget, fset)
+        
+    @apply
+    def font_name():
+        #"""Font Name"""
+        def fget(self):
+            return self.textArea.getFontName()
+        def fset(self, value):
+            self.textArea.setFontName(value)
+        return property(fget, fset)
 
-    @property
-    def font_size(self):
-        """Font Size"""
-        return self.textArea.getCharHeight()
-    @font_size.setter
-    def font_size(self, value):
-        self.textArea.setCharHeight(value)
-
-    @property
-    def font_name(self):
-        """Font Name"""
-        return self.textArea.getFontName()
-    @font_name.setter
-    def font_name(self, value):
-        self.textArea.setFontName(value)
-
-    @property
-    def on(self):
-        """Hidden or not"""
-        return self.panel.isVisible()
-    @on.setter
-    def on(self, value):
-        if value: self.panel.show()
-        else: self.panel.hide()
+    @apply
+    def on():
+        #"""Hidden or not"""
+        def fget(self):
+            return self.panel.isVisible()
+        def fset(self, value):
+            if value: self.panel.show()
+            else: self.panel.hide()
+        return property(fget, fset)
