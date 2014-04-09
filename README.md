@@ -23,10 +23,10 @@ If you have not already done so, please install BCI2000 and BCPy2000. See Instal
 	- C:\BCI2000\prod
 	- C:\BCI2000\FullMonty254-2011-710
 	- C:\BCI2000\BCPyOgreRenderer
-3. Edit the plugins.cfg.<os> (<os> is nt on Windows) file to point to the directory where Python-Ogre's plugins folder is.
-	- Note that the directory is relative to ???.
+3. Edit the plugins.cfg file to point to the directory where Python-Ogre's plugins folder is.
+	- Note that the directory is relative to the PythonAppWD (working directory).
 4. Edit the resources.cfg file to point to the media you will use (3D objects, materials, etc.)
-	- Note that the directory is relative to the PythonAppWD (working directory)
+	- Note that the directory is relative to the PythonAppWD.
 5. Edit test_dropin.bat
 	- The top two lines point to the location of the BCI2000 prog directory, relative to the location of test_drop.bat
 	- Line 9, PythonAppClassFile points to the location, relative to the BCI2000 prog directory, of the BCPy2000 application file.
